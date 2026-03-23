@@ -64,6 +64,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
+// Cek offline login saat halaman load
+(function(){
+  if(!navigator.onLine){
+    const saved=localStorage.getItem('admin_session');
+    if(saved){window.location.href='admin.html';return;}
+  }
+})();
+
 window.login = async function() {
   const email = document.getElementById('email').value.trim();
   const pass = document.getElementById('pass').value;
@@ -71,8 +79,26 @@ window.login = async function() {
   const btn = document.getElementById('btn-login');
   if(!email||!pass){err.textContent='Email dan password wajib diisi';err.style.display='block';return;}
   btn.textContent='Memuat...';btn.disabled=true;
+
+  // Mode offline: cek kredensial cache
+  if(!navigator.onLine){
+    const saved=localStorage.getItem('admin_session');
+    if(saved){
+      const s=JSON.parse(saved);
+      if(s.email===email&&s.pass===pass){
+        window.location.href='admin.html';return;
+      }
+    }
+    err.textContent='Offline — gunakan akun yang pernah login sebelumnya.';
+    err.style.display='block';
+    btn.textContent='Masuk';btn.disabled=false;
+    return;
+  }
+
   try {
     await signInWithEmailAndPassword(auth, email, pass);
+    // Simpan sesi untuk offline
+    localStorage.setItem('admin_session',JSON.stringify({email,pass}));
     window.location.href='admin.html';
   } catch(e) {
     let msg = 'Login gagal. Periksa email dan password.';

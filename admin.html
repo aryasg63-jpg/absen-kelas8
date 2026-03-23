@@ -319,18 +319,51 @@ if(localStorage.getItem('dark')==='1'){document.documentElement.classList.add('d
 function updateClock(){const n=new Date();document.getElementById('jam').textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;}
 setInterval(updateClock,1000);updateClock();
 
-onAuthStateChanged(auth,user=>{
-  if(!user){window.location.href='login.html';return;}
-  document.getElementById('auth-guard').style.display='block';
-  document.getElementById('admin-email').textContent=user.email;
-  init();
-});
-window.doLogout=async()=>{await signOut(auth);window.location.href='login.html';};
+// Jika offline, langsung pakai sesi cache tanpa tunggu Firebase
+if(!navigator.onLine){
+  const saved=localStorage.getItem('admin_session');
+  if(saved){
+    const s=JSON.parse(saved);
+    document.getElementById('auth-guard').style.display='block';
+    document.getElementById('admin-email').textContent=s.email+' (offline)';
+    init();
+  } else {
+    window.location.href='login.html';
+  }
+} else {
+  onAuthStateChanged(auth,user=>{
+    if(user){
+      const prev=localStorage.getItem('admin_session');
+      const prevPass=prev?JSON.parse(prev).pass:'';
+      localStorage.setItem('admin_session',JSON.stringify({email:user.email,pass:prevPass}));
+      document.getElementById('auth-guard').style.display='block';
+      document.getElementById('admin-email').textContent=user.email;
+      init();
+    } else {
+      window.location.href='login.html';
+    }
+  });
+}
+window.doLogout=async()=>{
+  localStorage.removeItem('admin_session');
+  try{await signOut(auth);}catch(e){}
+  window.location.href='login.html';
+};
 
 async function init(){
   document.getElementById('rek-tgl').value=todayStr();
   document.getElementById('edit-tgl').value=todayStr();
   document.getElementById('stat-bulan').value=nowMonth();
+  // Offline bar
+  const bar=document.createElement('div');bar.id='offline-bar-adm';
+  bar.style.cssText='position:fixed;bottom:0;left:0;right:0;padding:8px 16px;font-size:12px;font-weight:700;text-align:center;z-index:999;display:none';
+  document.body.appendChild(bar);
+  function updateBar(){
+    if(!navigator.onLine){bar.style.display='block';bar.style.background='#a3201e';bar.style.color='#fff';bar.textContent='Offline — menampilkan data cache. Perubahan tidak tersimpan.';}
+    else{bar.style.display='none';}
+  }
+  updateBar();
+  window.addEventListener('online',updateBar);window.addEventListener('offline',updateBar);
   await loadKelas();await loadSiswa();loadRekap();
 }
 
@@ -343,9 +376,15 @@ window.sw=function(t){
 };
 
 async function loadKelas(){
-  const snap=await getDocs(collection(db,'kelas'));
-  kelasList=[];snap.forEach(d=>kelasList.push({id:d.id,...d.data()}));
-  kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
+  try{
+    const snap=await getDocs(collection(db,'kelas'));
+    kelasList=[];snap.forEach(d=>kelasList.push({id:d.id,...d.data()}));
+    kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
+    localStorage.setItem('adm_cache_kelas',JSON.stringify(kelasList));
+  }catch(e){
+    const c=localStorage.getItem('adm_cache_kelas');
+    if(c){kelasList=JSON.parse(c);kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));}
+  }
   const opts=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
   ['rek-kelas','edit-kelas','stat-kelas'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">Semua kelas</option>'+opts;});
   ['sel-kelas-siswa','iz-kelas'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">-- Pilih kelas --</option>'+opts;});
@@ -381,9 +420,16 @@ window.hapusKelas=async function(id,nama){
 };
 
 async function loadSiswa(){
-  const snap=await getDocs(collection(db,'siswa'));
-  siswaList=[];snap.forEach(d=>siswaList.push({id:d.id,...d.data()}));
-  siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));renderQRGrid();
+  try{
+    const snap=await getDocs(collection(db,'siswa'));
+    siswaList=[];snap.forEach(d=>siswaList.push({id:d.id,...d.data()}));
+    siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));
+    localStorage.setItem('adm_cache_siswa',JSON.stringify(siswaList));
+  }catch(e){
+    const c=localStorage.getItem('adm_cache_siswa');
+    if(c){siswaList=JSON.parse(c);siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));}
+  }
+  renderQRGrid();
 }
 window.tambahSiswa=async function(){
   const kelasId=document.getElementById('sel-kelas-siswa').value,nama=document.getElementById('inp-nama-siswa').value.trim(),box=document.getElementById('alert-siswa');
@@ -450,10 +496,21 @@ function drawQR(canvas,text){
 window.loadRekap=async function(){
   const tgl=document.getElementById('rek-tgl').value||todayStr(),kelasId=document.getElementById('rek-kelas').value;
   let targets=kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList;
-  const as=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));
-  const am={};as.forEach(d=>am[d.data().nama]={...d.data(),id:d.id});
-  const isSnap=await getDocs(collection(db,'izin'));
-  const im={};isSnap.forEach(d=>{const dd=d.data();if(dd.tgl1<=tgl&&tgl<=dd.tgl2)im[dd.nama]=dd;});
+  const am={};const im={};
+  try{
+    const as=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));
+    as.forEach(d=>am[d.data().nama]={...d.data(),id:d.id});
+    localStorage.setItem('adm_cache_absen_'+tgl,JSON.stringify(Object.values(am)));
+    const isSnap=await getDocs(collection(db,'izin'));
+    const izinAll=[];isSnap.forEach(d=>izinAll.push(d.data()));
+    localStorage.setItem('adm_cache_izin',JSON.stringify(izinAll));
+    izinAll.forEach(dd=>{if(dd.tgl1<=tgl&&tgl<=dd.tgl2)im[dd.nama]=dd;});
+  }catch(e){
+    const ca=localStorage.getItem('adm_cache_absen_'+tgl);
+    if(ca)JSON.parse(ca).forEach(d=>am[d.nama]=d);
+    const ci=localStorage.getItem('adm_cache_izin');
+    if(ci)JSON.parse(ci).forEach(dd=>{if(dd.tgl1<=tgl&&tgl<=dd.tgl2)im[dd.nama]=dd;});
+  }
   let h=0,i=0,s=0,a=0;
   rekapData=targets.map((sw,idx)=>{
     const iz=im[sw.nama],ab=am[sw.nama];let st='Belum absen',jam='-';
@@ -492,8 +549,15 @@ window.exportPDF=function(){
 
 window.loadEditData=async function(){
   const tgl=document.getElementById('edit-tgl').value||todayStr(),kelasId=document.getElementById('edit-kelas').value;
-  const snap=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));
-  editDataAll=[];snap.forEach(d=>editDataAll.push({id:d.id,...d.data()}));
+  editDataAll=[];
+  try{
+    const snap=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));
+    snap.forEach(d=>editDataAll.push({id:d.id,...d.data()}));
+    localStorage.setItem('adm_cache_absen_'+tgl,JSON.stringify(editDataAll));
+  }catch(e){
+    const c=localStorage.getItem('adm_cache_absen_'+tgl);
+    if(c)editDataAll=JSON.parse(c);
+  }
   if(kelasId)editDataAll=editDataAll.filter(d=>d.kelasId===kelasId);
   editDataAll.sort((a,b)=>a.nama.localeCompare(b.nama));renderEditTable(editDataAll);
 };
@@ -529,8 +593,16 @@ window.tambahIzin=async function(){
   document.getElementById('iz-ket').value='';showAlert(box,`Data ${jenis} ${nama} disimpan`,'ok');loadIzin();
 };
 async function loadIzin(){
-  const snap=await getDocs(collection(db,'izin'));
-  const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));rows.sort((a,b)=>b.tgl1.localeCompare(a.tgl1));
+  let rows=[];
+  try{
+    const snap=await getDocs(collection(db,'izin'));
+    snap.forEach(d=>rows.push({id:d.id,...d.data()}));
+    localStorage.setItem('adm_cache_izin_full',JSON.stringify(rows));
+  }catch(e){
+    const c=localStorage.getItem('adm_cache_izin_full');
+    if(c)rows=JSON.parse(c);
+  }
+  rows.sort((a,b)=>b.tgl1.localeCompare(a.tgl1));
   const tb=document.getElementById('tbl-izin');
   if(!rows.length){tb.innerHTML='<tr><td colspan="6" style="color:var(--hint);text-align:center;padding:16px">Belum ada data</td></tr>';return;}
   tb.innerHTML=rows.map(d=>`<tr><td>${d.nama}</td><td><span class="badge ${d.jenis==='Izin'?'b-izin':'b-sakit'}">${d.jenis}</span></td><td>${d.tgl1}</td><td>${d.tgl2}</td><td style="color:var(--muted)">${d.ket||'-'}</td><td style="display:flex;gap:5px"><button class="btn btn-sm btn-blue" onclick="openEditIzin('${d.id}','${d.nama}','${d.jenis}','${d.tgl1}','${d.tgl2}','${(d.ket||'').replace(/'/g,'')}')">Edit</button><button class="btn btn-sm btn-red" onclick="hapusIzin('${d.id}')">Hapus</button></td></tr>`).join('');
