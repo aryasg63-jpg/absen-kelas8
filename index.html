@@ -345,17 +345,33 @@ async function startScanLoop(){
     if(typeof window.jsQR==='function'){
       startCanvasScan();return;
     }
-    const s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js';
-    s.onload=()=>{console.log('jsQR siap via cdnjs');startCanvasScan();};
-    s.onerror=()=>{
-      const s2=document.createElement('script');
-      s2.src='https://unpkg.com/jsqr@1.4.0/dist/jsQR.js';
-      s2.onload=()=>{console.log('jsQR siap via unpkg');startCanvasScan();};
-      s2.onerror=()=>{console.warn('jsQR gagal, pakai SimpleQR');startCanvasScan();};
-      document.head.appendChild(s2);
-    };
-    document.head.appendChild(s);
+    // Load jsQR dan poll sampai tersedia (Edge blokir onload event)
+    function loadAndScan(src, fallbackSrc){
+      const s=document.createElement('script');
+      s.src=src;
+      document.head.appendChild(s);
+      let tries=0;
+      const poll=setInterval(()=>{
+        tries++;
+        if(typeof window.jsQR==='function'){
+          clearInterval(poll);
+          console.log('jsQR siap, mulai scan');
+          startCanvasScan();
+        } else if(tries>20 && fallbackSrc){
+          clearInterval(poll);
+          console.log('Coba fallback CDN...');
+          loadAndScan(fallbackSrc, null);
+        } else if(tries>40){
+          clearInterval(poll);
+          console.warn('jsQR gagal total, pakai SimpleQR');
+          startCanvasScan();
+        }
+      },200);
+    }
+    loadAndScan(
+      'https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js',
+      'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js'
+    );
     return;
   }
 
