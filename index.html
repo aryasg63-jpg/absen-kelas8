@@ -386,22 +386,43 @@ function startCanvasScan(){
     if(raw===lastResult&&now-lastTime<5000)return false;
     lastResult=raw;lastTime=now;return true;
   }
-  scanInterval=setInterval(()=>{
-    if(!video.srcObject||video.paused||video.videoWidth===0)return;
-    canvas.width=video.videoWidth;canvas.height=video.videoHeight;
-    ctx.drawImage(video,0,0);
-    // Gunakan jsQR jika sudah loaded, atau SimpleQR sebagai fallback
-    const qrDecoder=window.jsQR;
-    if(typeof qrDecoder==='function'){
+  function runScan(){
+    scanInterval=setInterval(()=>{
+      if(!video.srcObject||video.paused||video.videoWidth===0)return;
+      canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+      ctx.drawImage(video,0,0);
       const img=ctx.getImageData(0,0,canvas.width,canvas.height);
-      const code=qrDecoder(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
-      if(code&&code.data&&shouldProcess(code.data))processQRResult(code.data);
-    } else if(window.SimpleQR){
-      const img=ctx.getImageData(0,0,canvas.width,canvas.height);
-      const result=window.SimpleQR.decode(img.data,canvas.width,canvas.height);
-      if(result&&result.data&&shouldProcess(result.data))processQRResult(result.data);
+      // Coba jsQR (real library) dulu
+      if(typeof window.jsQR==='function'&&window.jsQR.toString().length>500){
+        const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
+        if(code&&code.data&&shouldProcess(code.data)){console.log('QR detected:',code.data);processQRResult(code.data);}
+      } else {
+        // Fallback ke decoder bawaan
+        const result=window.SimpleQR?window.SimpleQR.decode(img.data,img.width,img.height):null;
+        if(result&&result.data&&shouldProcess(result.data))processQRResult(result.data);
+        // Coba built-in jsQR (versi sederhana)
+        if(!result&&typeof window.jsQR==='function'){
+          const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
+          if(code&&code.data&&shouldProcess(code.data))processQRResult(code.data);
+        }
+      }
+    },200);
+  }
+  // Tunggu jsQR real tersedia (max 10 detik), lalu mulai scan
+  let waitCount=0;
+  const waitJsQR=setInterval(()=>{
+    waitCount++;
+    const isReal=typeof window.jsQR==='function'&&window.jsQR.toString().length>500;
+    if(isReal){
+      clearInterval(waitJsQR);
+      console.log('jsQR real tersedia, mulai scan!');
+      runScan();
+    } else if(waitCount>50){
+      clearInterval(waitJsQR);
+      console.log('Timeout tunggu jsQR, pakai fallback');
+      runScan();
     }
-  },150);
+  },200);
 }
 
 loadKelas();
