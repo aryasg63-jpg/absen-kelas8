@@ -220,13 +220,113 @@ const db=getFirestore(app);
 let kelasList=[],siswaList=[],absenHariIni={},selectedKelas='';
 let camStream=null,scanInterval=null,unsubscribe=null;
 
+// ── OFFLINE / IndexedDB ──────────────────────────────────────────────
+const IDB_NAME='absen-offline',IDB_VER=1,IDB_STORE='pending';
+let idb=null;
+function openIDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(IDB_NAME,IDB_VER);
+    req.onupgradeneeded=e=>{e.target.result.createObjectStore(IDB_STORE,{keyPath:'id',autoIncrement:true});};
+    req.onsuccess=e=>{idb=e.target.result;res(idb);};
+    req.onerror=()=>rej(req.error);
+  });
+}
+async function idbSave(rec){
+  await openIDB();
+  return new Promise((res,rej)=>{
+    const tx=idb.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).add(rec).onsuccess=e=>res(e.target.result);
+    tx.onerror=()=>rej(tx.error);
+  });
+}
+async function idbGetAll(){
+  await openIDB();
+  return new Promise((res,rej)=>{
+    const tx=idb.transaction(IDB_STORE,'readonly');
+    const req=tx.objectStore(IDB_STORE).getAll();
+    req.onsuccess=()=>res(req.result);
+    req.onerror=()=>rej(req.error);
+  });
+}
+async function idbDelete(id){
+  await openIDB();
+  return new Promise((res,rej)=>{
+    const tx=idb.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).delete(id).onsuccess=()=>res();
+    tx.onerror=()=>rej(tx.error);
+  });
+}
+function updateOnlineBar(){
+  let bar=document.getElementById('offline-bar');
+  if(!bar){
+    bar=document.createElement('div');bar.id='offline-bar';
+    bar.style.cssText='position:fixed;bottom:0;left:0;right:0;padding:8px 16px;font-size:12px;font-weight:700;text-align:center;z-index:999;transition:background .3s;display:none';
+    document.body.appendChild(bar);
+  }
+  if(!navigator.onLine){
+    bar.style.display='block';
+    bar.style.background='#a3201e';bar.style.color='#fff';
+    bar.textContent='Offline — absensi disimpan sementara, akan dikirim saat online';
+  } else {
+    idbGetAll().then(items=>{
+      if(items.length>0){
+        bar.style.display='block';
+        bar.style.background='#8a5a00';bar.style.color='#fff';
+        bar.textContent='Menyinkronkan '+items.length+' data absen...';
+      } else {
+        bar.style.display='none';
+      }
+    }).catch(()=>{bar.style.display='none';});
+  }
+}
+async function syncPending(){
+  if(!navigator.onLine)return;
+  let items=[];
+  try{items=await idbGetAll();}catch(e){return;}
+  if(!items.length){updateOnlineBar();return;}
+  let synced=0;
+  for(const item of items){
+    try{
+      const {id,...data}=item;
+      const existing=await getDocs(query(collection(db,'absensi'),
+        where('nama','==',data.nama),
+        where('tanggal','==',data.tanggal),
+        where('kelasId','==',data.kelasId)
+      ));
+      if(existing.empty){
+        await addDoc(collection(db,'absensi'),{
+          nama:data.nama,kelasId:data.kelasId,tanggal:data.tanggal,
+          jamStr:data.jamStr,status:data.status,
+          waktu:Timestamp.fromDate(new Date(data.waktuMs))
+        });
+      }
+      await idbDelete(id);synced++;
+    }catch(e){console.warn('Sync gagal item:',e);}
+  }
+  if(synced>0){
+    const box=document.getElementById('alert-box');
+    if(box)showAlert(box,synced+' data offline berhasil disinkronkan','ok');
+  }
+  updateOnlineBar();
+}
+window.addEventListener('online',()=>{updateOnlineBar();setTimeout(syncPending,1000);});
+window.addEventListener('offline',()=>updateOnlineBar());
+
 async function loadKelas(){
-  const snap=await getDocs(collection(db,'kelas'));
-  kelasList=[];snap.forEach(d=>kelasList.push({id:d.id,...d.data()}));
-  kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
   const sel=document.getElementById('sel-kelas');
+  try{
+    const snap=await getDocs(collection(db,'kelas'));
+    kelasList=[];snap.forEach(d=>kelasList.push({id:d.id,...d.data()}));
+    kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
+    // Cache ke localStorage
+    localStorage.setItem('cache_kelas',JSON.stringify(kelasList));
+  }catch(e){
+    // Offline: ambil dari cache
+    const cached=localStorage.getItem('cache_kelas');
+    if(cached){kelasList=JSON.parse(cached);}
+  }
   if(!kelasList.length){sel.innerHTML='<option value="">Belum ada kelas — buat di admin</option>';return;}
-  sel.innerHTML=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
+  sel.innerHTML=kelasList.map(k=>'<option value="'+k.id+'">'+k.nama+'</option>').join('');
   selectedKelas=kelasList[0].id;sel.value=selectedKelas;
   gantiKelas();
 }
@@ -240,19 +340,35 @@ window.gantiKelas=function(){
 
 async function loadSiswa(){
   if(!selectedKelas)return;
-  const snap=await getDocs(query(collection(db,'siswa'),where('kelasId','==',selectedKelas)));
-  siswaList=[];snap.forEach(d=>siswaList.push({id:d.id,...d.data()}));
+  try{
+    const snap=await getDocs(query(collection(db,'siswa'),where('kelasId','==',selectedKelas)));
+    siswaList=[];snap.forEach(d=>siswaList.push({id:d.id,...d.data()}));
+    localStorage.setItem('cache_siswa_'+selectedKelas,JSON.stringify(siswaList));
+  }catch(e){
+    const cached=localStorage.getItem('cache_siswa_'+selectedKelas);
+    if(cached)siswaList=JSON.parse(cached);
+  }
   updateCounter();
 }
 
 function subscribeAbsen(){
   if(unsubscribe)unsubscribe();
   if(!selectedKelas)return;
-  const q=query(collection(db,'absensi'),where('tanggal','==',todayStr()),where('kelasId','==',selectedKelas));
-  unsubscribe=onSnapshot(q,snap=>{
-    absenHariIni={};snap.forEach(d=>absenHariIni[d.data().nama]={...d.data(),id:d.id});
-    renderLog();updateCounter();
-  },err=>console.error('Firestore:',err));
+  if(!navigator.onLine){
+    // Offline: tampilkan data lokal saja, pending items sudah di absenHariIni
+    renderLog();updateCounter();return;
+  }
+  try{
+    const q=query(collection(db,'absensi'),where('tanggal','==',todayStr()),where('kelasId','==',selectedKelas));
+    unsubscribe=onSnapshot(q,snap=>{
+      absenHariIni={};snap.forEach(d=>absenHariIni[d.data().nama]={...d.data(),id:d.id});
+      // Merge dengan data offline pending
+      idbGetAll().then(pending=>{
+        pending.forEach(p=>{if(!absenHariIni[p.nama])absenHariIni[p.nama]={...p,_pending:true};});
+        renderLog();updateCounter();
+      }).catch(()=>{renderLog();updateCounter();});
+    },err=>{console.error('Firestore:',err);renderLog();updateCounter();});
+  }catch(e){renderLog();updateCounter();}
 }
 
 function updateCounter(){
@@ -265,10 +381,11 @@ function renderLog(){
   const items=Object.values(absenHariIni).sort((a,b)=>(b.waktu?.seconds||0)-(a.waktu?.seconds||0));
   document.getElementById('log-count').textContent=`${items.length} siswa`;
   if(!items.length){list.innerHTML='<p style="color:var(--hint);font-size:13px;text-align:center;padding:12px">Belum ada yang absen</p>';return;}
-  list.innerHTML=items.map(d=>`<div class="log-item">
-    <div><div class="log-name">${d.nama}</div><div class="log-time">${d.jamStr}</div></div>
-    <span class="badge ${d.status==='Hadir'?'b-hadir':d.status==='Terlambat'?'b-terlambat':'b-alfa'}">${d.status}</span>
-  </div>`).join('');
+  list.innerHTML=items.map(d=>{
+    const badgeCls=d.status==='Hadir'?'b-hadir':d.status==='Terlambat'?'b-terlambat':'b-alfa';
+    const pendingBadge=d._pending?'<span style="font-size:10px;color:var(--amber);margin-left:4px">⏳</span>':'';
+    return '<div class="log-item"><div><div class="log-name">'+d.nama+pendingBadge+'</div><div class="log-time">'+d.jamStr+'</div></div><span class="badge '+badgeCls+'">'+d.status+'</span></div>';
+  }).join('');
 }
 
 function playSound(ok){
@@ -296,19 +413,51 @@ async function doAbsen(nama){
   nama=nama.trim();
   if(!nama){showAlert(box,'Nama tidak boleh kosong','err');flashScreen(false);playSound(false);return;}
   if(!selectedKelas){showAlert(box,'Pilih kelas terlebih dahulu','err');return;}
-  if(absenHariIni[nama]){showAlert(box,`${nama} sudah absen pukul ${absenHariIni[nama].jamStr}`,'err');flashScreen(false);playSound(false);return;}
+  if(absenHariIni[nama]){showAlert(box,nama+' sudah absen pukul '+absenHariIni[nama].jamStr,'err');flashScreen(false);playSound(false);return;}
   const now=new Date();
   const tot=now.getHours()*60+now.getMinutes();
   const status=tot<=(BATAS_H*60+BATAS_M)?'Hadir':'Terlambat';
-  const jamStr=`${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const jamStr=pad(now.getHours())+':'+pad(now.getMinutes());
+  const rec={nama,kelasId:selectedKelas,tanggal:todayStr(),jamStr,status,waktuMs:now.getTime()};
+
+  if(!navigator.onLine){
+    // Simpan ke IndexedDB
+    try{
+      await idbSave(rec);
+      // Tampilkan di log lokal sementara
+      absenHariIni[nama]={...rec,jamStr,status};
+      renderLog();updateCounter();
+      showAlert(box,'[OFFLINE] '+nama+' dicatat — '+status+' pukul '+jamStr,'info');
+      flashScreen(true);playSound(true);
+      document.getElementById('inp-nama').value='';
+      updateOnlineBar();
+    }catch(e){
+      showAlert(box,'Gagal simpan offline: '+e.message,'err');
+      flashScreen(false);playSound(false);
+    }
+    return;
+  }
+
+  // Online: langsung ke Firestore
   try{
     await addDoc(collection(db,'absensi'),{nama,kelasId:selectedKelas,tanggal:todayStr(),jamStr,status,waktu:Timestamp.fromDate(now)});
-    showAlert(box,`✓ ${nama} — ${status} pukul ${jamStr}`,'ok');
+    showAlert(box,'✓ '+nama+' — '+status+' pukul '+jamStr,'ok');
     flashScreen(true);playSound(true);
     document.getElementById('inp-nama').value='';
   }catch(e){
-    showAlert(box,'Gagal menyimpan: '+e.message,'err');
-    flashScreen(false);playSound(false);
+    // Firestore gagal, fallback ke offline
+    try{
+      await idbSave(rec);
+      absenHariIni[nama]={...rec};
+      renderLog();updateCounter();
+      showAlert(box,'[Tersimpan lokal] '+nama+' — '+status,'info');
+      flashScreen(true);playSound(true);
+      document.getElementById('inp-nama').value='';
+      updateOnlineBar();
+    }catch(e2){
+      showAlert(box,'Gagal menyimpan: '+e.message,'err');
+      flashScreen(false);playSound(false);
+    }
   }
 }
 
@@ -395,6 +544,7 @@ async function startScanLoop(){
   }
 }
 
+openIDB().then(()=>{updateOnlineBar();syncPending();});
 loadKelas();
 </script>
 </body>
