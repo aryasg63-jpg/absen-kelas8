@@ -396,7 +396,7 @@ window.renderQRGrid=function(){
   grid.innerHTML='';
   filtered.forEach(s=>{
     const div=document.createElement('div');div.className='qr-card';
-    const canv=document.createElement('canvas');canv.width=120;canv.height=120;canv.dataset.nama=s.nama;div.appendChild(canv);
+    const canv=document.createElement('canvas');canv.width=150;canv.height=150;canv.dataset.nama=s.nama;div.appendChild(canv);
     const nm=document.createElement('div');nm.className='qr-name';nm.textContent=s.nama;div.appendChild(nm);
     if(s.kelasNama){const kl=document.createElement('div');kl.className='qr-kelas';kl.textContent=s.kelasNama;div.appendChild(kl);}
     const btns=document.createElement('div');btns.className='qr-btns';
@@ -426,8 +426,8 @@ window.printSemuaQR=function(){
 async function hapusSiswa(id,nama){if(!confirm(`Hapus "${nama}"?`))return;await deleteDoc(doc(db,'siswa',id));siswaList=siswaList.filter(s=>s.id!==id);renderQRGrid();}
 function drawQR(canvas,text){
   const tmp=document.createElement('div');tmp.style.cssText='position:absolute;left:-9999px';document.body.appendChild(tmp);
-  try{new QRCode(tmp,{text,width:120,height:120,colorDark:'#1a1917',colorLight:'#ffffff'});
-    setTimeout(()=>{const el=tmp.querySelector('canvas')||tmp.querySelector('img');if(el){const ctx=canvas.getContext('2d');if(el.tagName==='CANVAS'){ctx.drawImage(el,0,0,120,120);}else{const img=new Image();img.onload=()=>ctx.drawImage(img,0,0,120,120);img.src=el.src;}}try{document.body.removeChild(tmp);}catch(e){}},350);
+  try{new QRCode(tmp,{text,width:150,height:150,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
+    setTimeout(()=>{const el=tmp.querySelector('canvas')||tmp.querySelector('img');if(el){const ctx=canvas.getContext('2d');if(el.tagName==='CANVAS'){ctx.drawImage(el,0,0,canvas.width,canvas.height);}else{const img=new Image();img.onload=()=>ctx.drawImage(img,0,0,canvas.width,canvas.height);img.src=el.src;}}try{document.body.removeChild(tmp);}catch(e){}},350);
   }catch(e){try{document.body.removeChild(tmp);}catch(x){}}
 }
 
