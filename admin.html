@@ -102,6 +102,15 @@ tbody tr:hover td{background:var(--gray)}
 }
 @media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}.frow,.frow3{grid-template-columns:1fr}}
 </style>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/absen-kelas8/sw.js')
+      .then(r=>console.log('SW registered'))
+      .catch(e=>console.warn('SW failed:',e));
+  });
+}
+</script>
 </head>
 <body>
 <div id="print-area" style="display:none"></div>

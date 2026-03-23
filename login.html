@@ -22,6 +22,15 @@
   .back{text-align:center;margin-top:14px;font-size:13px;color:#6b6963}
   .back a{color:#1a1917;font-weight:600;text-decoration:none}
 </style>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/absen-kelas8/sw.js')
+      .then(r=>console.log('SW registered'))
+      .catch(e=>console.warn('SW failed:',e));
+  });
+}
+</script>
 </head>
 <body>
 <div class="card">
