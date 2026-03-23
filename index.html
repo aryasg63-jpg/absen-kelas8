@@ -179,6 +179,7 @@ if('serviceWorker' in navigator){
   </div>
 
   <div class="admin-link" style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:1rem">
+    <button class="btn" id="btn-save-offline" onclick="simpanDataOffline()" style="font-size:12px;padding:6px 14px">💾 Simpan Data untuk Offline</button>
     <button class="btn" onclick="unduhCache()" style="font-size:12px;padding:6px 14px;color:var(--muted)">⬇ Unduh Cache Absen Hari Ini</button>
     <a href="login.html" style="font-size:12px">🔐 Masuk sebagai Admin</a>
   </div>
@@ -600,6 +601,60 @@ async function startScanLoop(){
 }
 
 openIDB().then(()=>{updateOnlineBar();syncPending();});
+
+// Simpan semua data penting ke localStorage untuk mode offline
+window.simpanDataOffline=async function(){
+  const btn=document.getElementById('btn-save-offline');
+  if(!navigator.onLine){
+    alert('Tidak bisa simpan saat offline. Hubungkan internet dulu.');return;
+  }
+  btn.textContent='Menyimpan...';btn.disabled=true;
+  try{
+    // 1. Simpan semua kelas
+    const kelasSnap=await getDocs(collection(db,'kelas'));
+    const kelasFresh=[];kelasSnap.forEach(d=>kelasFresh.push({id:d.id,...d.data()}));
+    kelasFresh.sort((a,b)=>a.nama.localeCompare(b.nama));
+    localStorage.setItem('cache_kelas',JSON.stringify(kelasFresh));
+    localStorage.setItem('adm_cache_kelas',JSON.stringify(kelasFresh));
+
+    // 2. Simpan semua siswa
+    const siswaSnap=await getDocs(collection(db,'siswa'));
+    const siswaFresh=[];siswaSnap.forEach(d=>siswaFresh.push({id:d.id,...d.data()}));
+    localStorage.setItem('adm_cache_siswa',JSON.stringify(siswaFresh));
+    // Simpan per kelas juga
+    kelasFresh.forEach(k=>{
+      const filtered=siswaFresh.filter(s=>s.kelasId===k.id);
+      localStorage.setItem('cache_siswa_'+k.id,JSON.stringify(filtered));
+    });
+
+    // 3. Simpan absensi hari ini
+    const today=todayStr();
+    const absenSnap=await getDocs(query(collection(db,'absensi'),where('tanggal','==',today)));
+    const absenFresh=[];absenSnap.forEach(d=>absenFresh.push({id:d.id,...d.data()}));
+    localStorage.setItem('adm_cache_absen_'+today,JSON.stringify(absenFresh));
+
+    // 4. Simpan izin
+    const izinSnap=await getDocs(collection(db,'izin'));
+    const izinFresh=[];izinSnap.forEach(d=>izinFresh.push({id:d.id,...d.data()}));
+    localStorage.setItem('adm_cache_izin',JSON.stringify(izinFresh));
+    localStorage.setItem('adm_cache_izin_full',JSON.stringify(izinFresh));
+
+    const total=kelasFresh.length+' kelas, '+siswaFresh.length+' siswa, '+absenFresh.length+' absen hari ini, '+izinFresh.length+' izin';
+    btn.textContent='✓ Tersimpan!';btn.style.background='var(--green)';btn.style.color='#fff';
+    setTimeout(()=>{btn.textContent='💾 Simpan Data untuk Offline';btn.style.background='';btn.style.color='';btn.disabled=false;},3000);
+    const box=document.getElementById('alert-box');
+    showAlert(box,'Data offline tersimpan: '+total,'ok');
+
+    // Reload kelas agar dropdown terupdate
+    kelasList=kelasFresh;
+    const sel=document.getElementById('sel-kelas');
+    sel.innerHTML=kelasList.map(k=>'<option value="'+k.id+'">'+k.nama+'</option>').join('');
+    if(kelasList.length){selectedKelas=kelasList[0].id;sel.value=selectedKelas;gantiKelas();}
+  }catch(e){
+    btn.textContent='Gagal - coba lagi';btn.disabled=false;
+    console.error(e);
+  }
+};
 
 // Unduh cache absensi hari ini sebagai JSON
 window.unduhCache=async function(){
