@@ -4,19 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Scan Absen</title>
-<script>
-// Load jsQR with fallback
-(function(){
-  var s=document.createElement('script');
-  s.src='https://unpkg.com/jsqr@1.4.0/dist/jsQR.js';
-  s.onerror=function(){
-    var s2=document.createElement('script');
-    s2.src='https://unpkg.com/jsqr@1.4.0/dist/jsQR.js';
-    document.head.appendChild(s2);
-  };
-  document.head.appendChild(s);
-})();
-</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -58,6 +45,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .alert{padding:12px 16px;border-radius:var(--r);font-size:14px;font-weight:600;margin-bottom:12px;display:none;border:1px solid transparent;text-align:center}
 .a-ok{background:var(--green-bg);color:var(--green);border-color:var(--green-bdr)}
 .a-err{background:var(--red-bg);color:var(--red);border-color:var(--red-bdr)}
+.a-info{background:var(--blue-bg);color:var(--blue);border-color:#a8c4f0}
 .scanner-wrap{position:relative;width:100%;border-radius:var(--rl);overflow:hidden;border:2px solid var(--border);background:#000;margin-bottom:1rem;display:none}
 #cam-video{width:100%;display:block;max-height:300px;object-fit:cover}
 .scan-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
@@ -166,7 +154,10 @@ window.toggleDark=function(){
   localStorage.setItem('dark',d?'1':'0');
   document.getElementById('dark-toggle').textContent=d?'☀️':'🌙';
 };
-if(localStorage.getItem('dark')==='1'){document.documentElement.classList.add('dark');document.getElementById('dark-toggle').textContent='☀️';}
+if(localStorage.getItem('dark')==='1'){
+  document.documentElement.classList.add('dark');
+  document.getElementById('dark-toggle').textContent='☀️';
+}
 
 function updateClock(){
   const now=new Date();
@@ -231,7 +222,7 @@ function subscribeAbsen(){
   unsubscribe=onSnapshot(q,snap=>{
     absenHariIni={};snap.forEach(d=>absenHariIni[d.data().nama]={...d.data(),id:d.id});
     renderLog();updateCounter();
-  },err=>console.error('Firestore error:',err));
+  },err=>console.error('Firestore:',err));
 }
 
 function updateCounter(){
@@ -286,27 +277,28 @@ async function doAbsen(nama){
     flashScreen(true);playSound(true);
     document.getElementById('inp-nama').value='';
   }catch(e){
-    console.error(e);
     showAlert(box,'Gagal menyimpan: '+e.message,'err');
     flashScreen(false);playSound(false);
   }
 }
 
 function showAlert(el,msg,type){
-  el.textContent=msg;el.className='alert '+(type==='ok'?'a-ok':'a-err');el.style.display='block';
+  el.textContent=msg;
+  el.className='alert '+(type==='ok'?'a-ok':type==='info'?'a-info':'a-err');
+  el.style.display='block';
   setTimeout(()=>el.style.display='none',3500);
 }
 
 window.absenManual=()=>doAbsen(document.getElementById('inp-nama').value);
 
 window.startCam=async function(){
+  const box=document.getElementById('alert-box');
   if(!navigator.mediaDevices?.getUserMedia){
-    alert('Browser tidak mendukung kamera. Gunakan Chrome atau Edge.');return;
+    alert('Browser tidak mendukung kamera. Gunakan Chrome atau Edge terbaru.');return;
   }
   try{
     camStream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},
-      audio:false
+      video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false
     });
     const v=document.getElementById('cam-video');
     v.srcObject=camStream;
@@ -315,7 +307,7 @@ window.startCam=async function(){
     startScanLoop();
   }catch(e){
     if(e.name==='NotAllowedError'){
-      alert('Izin kamera ditolak.\n\nCara mengizinkan:\n1. Klik ikon gembok/kamera di address bar\n2. Pilih "Izinkan" untuk kamera\n3. Refresh halaman');
+      alert('Izin kamera ditolak.\n\nKlik ikon gembok di address bar → Izinkan → Refresh halaman.');
     }else{
       alert('Error kamera: '+e.message);
     }
@@ -329,39 +321,75 @@ window.stopCam=function(){
   document.getElementById('cam-video').srcObject=null;
 };
 
-function startScanLoop(){
+function processQRResult(raw){
+  let nama=raw.trim();
+  if(nama.includes('|KELAS8|'))nama=nama.split('|KELAS8|')[1];
+  else if(nama.startsWith('ABSEN|'))nama=nama.split('|').pop();
+  doAbsen(nama);
+}
+
+async function startScanLoop(){
   const video=document.getElementById('cam-video');
-  const canvas=document.getElementById('scan-canvas');
-  const ctx=canvas.getContext('2d',{willReadFrequently:true});
   let lastResult='',lastTime=0;
 
-  console.log('Scan loop started, video size:', video.videoWidth, 'x', video.videoHeight);
+  function shouldProcess(raw){
+    const now=Date.now();
+    if(raw===lastResult&&now-lastTime<5000)return false;
+    lastResult=raw;lastTime=now;
+    return true;
+  }
+
+  // Coba BarcodeDetector dulu (native API, tidak butuh CDN)
+  if('BarcodeDetector' in window){
+    console.log('Menggunakan BarcodeDetector native');
+    let detector;
+    try{detector=new BarcodeDetector({formats:['qr_code']});}
+    catch(e){detector=new BarcodeDetector();}
+    scanInterval=setInterval(async()=>{
+      if(!video.srcObject||video.paused||video.videoWidth===0)return;
+      try{
+        const codes=await detector.detect(video);
+        if(codes.length>0&&shouldProcess(codes[0].rawValue)){
+          processQRResult(codes[0].rawValue);
+        }
+      }catch(e){}
+    },150);
+    return;
+  }
+
+  // Fallback: canvas + jsQR via cdnjs (tidak diblokir Edge)
+  console.log('Memuat jsQR via cdnjs...');
+  const canvas=document.getElementById('scan-canvas');
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+
+  await new Promise(resolve=>{
+    if(window.jsQR){resolve();return;}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js';
+    s.onload=()=>{console.log('jsQR loaded via cdnjs');resolve();};
+    s.onerror=()=>{
+      console.warn('cdnjs gagal, coba unpkg...');
+      const s2=document.createElement('script');
+      s2.src='https://unpkg.com/jsqr@1.4.0/dist/jsQR.js';
+      s2.onload=()=>{console.log('jsQR loaded via unpkg');resolve();};
+      s2.onerror=()=>{console.error('Semua CDN gagal');resolve();};
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);
+  });
+
   scanInterval=setInterval(()=>{
-    if(!video.srcObject||video.paused||video.videoWidth===0){return;}
-    canvas.width=video.videoWidth;
-    canvas.height=video.videoHeight;
+    if(!video.srcObject||video.paused||video.videoWidth===0)return;
+    if(typeof window.jsQR!=='function')return;
+    canvas.width=video.videoWidth;canvas.height=video.videoHeight;
     ctx.drawImage(video,0,0);
-
-    const qrFn=window.jsQR||window._jsQR;
-    if(typeof qrFn!=='function'){console.warn('jsQR not ready');return;}
-    const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
-    const code=qrFn(imageData.data,imageData.width,imageData.height,{inversionAttempts:'attemptBoth'});
-    if(code)console.log('QR detected:',code.data);
-
-    if(code&&code.data){
-      const now=Date.now();
-      if(code.data===lastResult&&now-lastTime<5000)return;
-      lastResult=code.data;lastTime=now;
-      let nama=code.data;
-      if(nama.includes('|KELAS8|'))nama=nama.split('|KELAS8|')[1];
-      else if(nama.startsWith('ABSEN|'))nama=nama.split('|').pop();
-      doAbsen(nama);
-    }
-  },200);
+    const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
+    if(code?.data&&shouldProcess(code.data))processQRResult(code.data);
+  },150);
 }
 
 loadKelas();
 </script>
-
 </body>
 </html>
