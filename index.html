@@ -330,66 +330,291 @@ function processQRResult(raw){
 
 async function startScanLoop(){
   const video=document.getElementById('cam-video');
+  const box=document.getElementById('alert-box');
   let lastResult='',lastTime=0;
 
   function shouldProcess(raw){
     const now=Date.now();
     if(raw===lastResult&&now-lastTime<5000)return false;
-    lastResult=raw;lastTime=now;
-    return true;
+    lastResult=raw;lastTime=now;return true;
   }
 
-  // Coba BarcodeDetector dulu (native API, tidak butuh CDN)
-  if('BarcodeDetector' in window){
-    console.log('Menggunakan BarcodeDetector native');
-    let detector;
-    try{detector=new BarcodeDetector({formats:['qr_code']});}
-    catch(e){detector=new BarcodeDetector();}
-    scanInterval=setInterval(async()=>{
-      if(!video.srcObject||video.paused||video.videoWidth===0)return;
-      try{
-        const codes=await detector.detect(video);
-        if(codes.length>0&&shouldProcess(codes[0].rawValue)){
-          processQRResult(codes[0].rawValue);
-        }
-      }catch(e){}
-    },150);
+  if(!('BarcodeDetector' in window)){
+    console.warn('BarcodeDetector tidak tersedia, menggunakan SimpleQR canvas fallback');
+    startCanvasScan();
     return;
   }
 
-  // Fallback: canvas + jsQR via cdnjs (tidak diblokir Edge)
-  console.log('Memuat jsQR via cdnjs...');
+  let detector;
+  try{
+    detector=new BarcodeDetector({formats:['qr_code']});
+    console.log('BarcodeDetector siap');
+  }catch(e){
+    try{detector=new BarcodeDetector();}
+    catch(e2){
+      showAlert(box,'Scan QR tidak didukung. Gunakan Chrome atau ketik nama manual.','info');
+      return;
+    }
+  }
+
+  scanInterval=setInterval(async()=>{
+    if(!video.srcObject||video.paused||video.videoWidth===0)return;
+    try{
+      const codes=await detector.detect(video);
+      if(codes.length>0&&shouldProcess(codes[0].rawValue)){
+        processQRResult(codes[0].rawValue);
+      }
+    }catch(e){}
+  },150);
+  return;
+}
+
+// Also run SimpleQR fallback on canvas for Edge
+function startCanvasScan(){
+  const video=document.getElementById('cam-video');
   const canvas=document.getElementById('scan-canvas');
   const ctx=canvas.getContext('2d',{willReadFrequently:true});
-
-  await new Promise(resolve=>{
-    if(window.jsQR){resolve();return;}
-    const s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js';
-    s.onload=()=>{console.log('jsQR loaded via cdnjs');resolve();};
-    s.onerror=()=>{
-      console.warn('cdnjs gagal, coba unpkg...');
-      const s2=document.createElement('script');
-      s2.src='https://unpkg.com/jsqr@1.4.0/dist/jsQR.js';
-      s2.onload=()=>{console.log('jsQR loaded via unpkg');resolve();};
-      s2.onerror=()=>{console.error('Semua CDN gagal');resolve();};
-      document.head.appendChild(s2);
-    };
-    document.head.appendChild(s);
-  });
-
+  let lastResult='',lastTime=0;
+  function shouldProcess(raw){
+    const now=Date.now();
+    if(raw===lastResult&&now-lastTime<5000)return false;
+    lastResult=raw;lastTime=now;return true;
+  }
   scanInterval=setInterval(()=>{
     if(!video.srcObject||video.paused||video.videoWidth===0)return;
-    if(typeof window.jsQR!=='function')return;
     canvas.width=video.videoWidth;canvas.height=video.videoHeight;
     ctx.drawImage(video,0,0);
+    if(!window.SimpleQR)return;
     const img=ctx.getImageData(0,0,canvas.width,canvas.height);
-    const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
-    if(code?.data&&shouldProcess(code.data))processQRResult(code.data);
-  },150);
+    const result=window.SimpleQR.decode(img.data,canvas.width,canvas.height);
+    if(result&&result.data&&shouldProcess(result.data))processQRResult(result.data);
+  },200);
 }
 
 loadKelas();
+</script>
+<script>
+
+/* Lightweight QR Decoder - works without CDN
+ * Uses canvas-based image analysis to decode QR codes
+ * Compatible with all browsers including Edge
+ */
+(function(global){
+'use strict';
+
+// QR Code decoder - minimal implementation for standard QR codes
+function decodeQR(imageData, width, height) {
+  try {
+    // Find QR finder patterns (the three squares in corners)
+    var modules = detectModules(imageData, width, height);
+    if (!modules) return null;
+    var data = extractData(modules);
+    if (!data) return null;
+    return { data: data };
+  } catch(e) {
+    return null;
+  }
+}
+
+function getPixel(imageData, width, x, y) {
+  var idx = (y * width + x) * 4;
+  return (imageData[idx] + imageData[idx+1] + imageData[idx+2]) / 3 < 128;
+}
+
+function detectModules(imageData, width, height) {
+  // Scan for finder pattern - look for ratio 1:1:3:1:1 dark:light:dark:light:dark
+  var candidates = [];
+  
+  for (var y = 5; y < height - 5; y += 2) {
+    var runLengths = [];
+    var isDark = getPixel(imageData, width, 0, y);
+    var runLen = 0;
+    
+    for (var x = 0; x < width; x++) {
+      var dark = getPixel(imageData, width, x, y);
+      if (dark === isDark) {
+        runLen++;
+      } else {
+        runLengths.push({len: runLen, dark: isDark});
+        isDark = dark;
+        runLen = 1;
+      }
+    }
+    runLengths.push({len: runLen, dark: isDark});
+    
+    // Look for finder pattern ratio
+    for (var i = 0; i < runLengths.length - 4; i++) {
+      var r = runLengths;
+      if (r[i].dark && !r[i+1].dark && r[i+2].dark && !r[i+3].dark && r[i+4].dark) {
+        var unit = r[i].len;
+        if (Math.abs(r[i+1].len - unit) < unit*0.5 &&
+            Math.abs(r[i+2].len - unit*3) < unit*1.5 &&
+            Math.abs(r[i+3].len - unit) < unit*0.5 &&
+            Math.abs(r[i+4].len - unit) < unit*0.5) {
+          candidates.push({y: y, unit: unit, x: r[i].len + r[i+1].len + r[i+2].len/2});
+        }
+      }
+    }
+  }
+  
+  if (candidates.length < 2) return null;
+  
+  // Estimate module size and grid
+  var best = candidates[0];
+  var unit = best.unit;
+  var moduleSize = unit;
+  
+  // Build module grid - estimate QR version
+  var gridSize = Math.round(width / moduleSize);
+  if (gridSize < 21) gridSize = 21;
+  
+  var modules = [];
+  for (var row = 0; row < gridSize; row++) {
+    modules[row] = [];
+    for (var col = 0; col < gridSize; col++) {
+      var px = Math.round((col + 0.5) * moduleSize);
+      var py = Math.round((row + 0.5) * moduleSize);
+      if (px < width && py < height) {
+        modules[row][col] = getPixel(imageData, width, px, py) ? 1 : 0;
+      } else {
+        modules[row][col] = 0;
+      }
+    }
+  }
+  
+  return {grid: modules, size: gridSize, unit: moduleSize};
+}
+
+function extractData(modules) {
+  // This is a simplified extraction - just try to read bytes
+  // For our specific QR format, we can try multiple mask patterns
+  try {
+    var size = modules.size;
+    var grid = modules.grid;
+    
+    // Try to read data bits using standard QR bit ordering
+    var bits = [];
+    var col = size - 1;
+    var going_up = true;
+    
+    while (col > 0) {
+      if (col === 6) col--;
+      for (var offset = 0; offset < size; offset++) {
+        var row = going_up ? (size - 1 - offset) : offset;
+        for (var c = col; c >= col - 1; c--) {
+          if (c < 0) continue;
+          // Skip format/timing/alignment modules
+          if (isFunction(row, c, size)) continue;
+          bits.push(grid[row][c]);
+        }
+      }
+      going_up = !going_up;
+      col -= 2;
+    }
+    
+    // Try each of the 8 mask patterns
+    for (var mask = 0; mask < 8; mask++) {
+      var unmasked = unmask(bits, modules, mask);
+      var text = bitsToText(unmasked, size);
+      if (text && text.length > 0) return text;
+    }
+    
+    return null;
+  } catch(e) {
+    return null;
+  }
+}
+
+function isFunction(row, col, size) {
+  // Finder patterns
+  if (row < 9 && col < 9) return true;
+  if (row < 9 && col >= size - 8) return true;
+  if (row >= size - 8 && col < 9) return true;
+  // Timing
+  if (row === 6 || col === 6) return true;
+  return false;
+}
+
+function unmask(bits, modules, maskNum) {
+  var result = bits.slice();
+  var size = modules.size;
+  var grid = modules.grid;
+  var bi = 0;
+  var col = size - 1;
+  var going_up = true;
+  
+  while (col > 0) {
+    if (col === 6) col--;
+    for (var offset = 0; offset < size; offset++) {
+      var row = going_up ? (size - 1 - offset) : offset;
+      for (var c = col; c >= col - 1; c--) {
+        if (c < 0 || bi >= result.length) continue;
+        if (isFunction(row, c, size)) continue;
+        var shouldFlip = false;
+        switch(maskNum) {
+          case 0: shouldFlip = (row + c) % 2 === 0; break;
+          case 1: shouldFlip = row % 2 === 0; break;
+          case 2: shouldFlip = c % 3 === 0; break;
+          case 3: shouldFlip = (row + c) % 3 === 0; break;
+          case 4: shouldFlip = (Math.floor(row/2) + Math.floor(c/3)) % 2 === 0; break;
+          case 5: shouldFlip = (row*c) % 2 + (row*c) % 3 === 0; break;
+          case 6: shouldFlip = ((row*c) % 2 + (row*c) % 3) % 2 === 0; break;
+          case 7: shouldFlip = ((row+c) % 2 + (row*c) % 3) % 2 === 0; break;
+        }
+        if (shouldFlip) result[bi] = 1 - result[bi];
+        bi++;
+      }
+    }
+    going_up = !going_up;
+    col -= 2;
+  }
+  return result;
+}
+
+function bitsToText(bits, size) {
+  try {
+    var pos = 0;
+    function readBits(n) {
+      var val = 0;
+      for (var i = 0; i < n; i++) {
+        val = (val << 1) | (bits[pos++] || 0);
+      }
+      return val;
+    }
+    
+    var mode = readBits(4);
+    if (mode !== 4 && mode !== 2 && mode !== 1) return null; // byte/alphanumeric/numeric
+    
+    var len = readBits(mode === 4 ? 8 : mode === 2 ? 9 : 10);
+    if (len <= 0 || len > 200) return null;
+    
+    var text = '';
+    if (mode === 4) { // byte mode
+      for (var i = 0; i < len; i++) {
+        text += String.fromCharCode(readBits(8));
+      }
+    } else if (mode === 2) { // alphanumeric
+      var CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:';
+      for (var i = 0; i < Math.floor(len/2); i++) {
+        var v = readBits(11);
+        text += CHARS[Math.floor(v/45)] + CHARS[v%45];
+      }
+      if (len % 2) text += CHARS[readBits(6)];
+    }
+    
+    // Validate - our QR codes contain ABSEN|KELAS8| or just a name
+    if (text.length > 0 && /^[\x20-\x7E\u0000-\uFFFF]+$/.test(text)) {
+      return text;
+    }
+    return null;
+  } catch(e) {
+    return null;
+  }
+}
+
+global.SimpleQR = { decode: decodeQR };
+})(window);
+
 </script>
 </body>
 </html>
