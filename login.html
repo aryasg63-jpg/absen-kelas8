@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login Admin — Absensi Kelas 8</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Plus Jakarta Sans',sans-serif;background:#f5f4f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem}
+  .card{background:#fff;border:1px solid #e2e0d8;border-radius:16px;padding:2rem;width:100%;max-width:380px}
+  .logo{text-align:center;margin-bottom:1.5rem}
+  .logo-icon{width:52px;height:52px;background:#1a1917;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:22px}
+  h1{font-size:20px;font-weight:700;color:#1a1917;text-align:center}
+  p{font-size:13px;color:#6b6963;text-align:center;margin-top:4px}
+  label{font-size:12px;font-weight:600;color:#6b6963;display:block;margin-bottom:4px;margin-top:14px}
+  input{width:100%;padding:9px 12px;border:1px solid #e2e0d8;border-radius:10px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;color:#1a1917;background:#fff;outline:none;transition:border .15s}
+  input:focus{border-color:#1a1917}
+  .btn{width:100%;padding:10px;background:#1a1917;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;margin-top:18px;transition:opacity .15s}
+  .btn:hover{opacity:0.85}
+  .err{background:#fce8e8;color:#a3201e;border:1px solid #f4a9a8;border-radius:8px;padding:9px 12px;font-size:13px;margin-top:12px;display:none}
+  .back{text-align:center;margin-top:14px;font-size:13px;color:#6b6963}
+  .back a{color:#1a1917;font-weight:600;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">🏫</div>
+    <h1>Admin Login</h1>
+    <p>Masuk untuk kelola absensi kelas 8</p>
+  </div>
+  <label>Email</label>
+  <input type="email" id="email" placeholder="admin@sekolah.com">
+  <label>Password</label>
+  <input type="password" id="pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()">
+  <div class="err" id="err"></div>
+  <button class="btn" onclick="login()" id="btn-login">Masuk</button>
+  <div class="back"><a href="index.html">← Kembali ke halaman scan</a></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDlCnUvgyDT-oTfJJ-nxcPWkhpY_b6JeBw",
+  authDomain: "absen-kelas8.firebaseapp.com",
+  projectId: "absen-kelas8",
+  storageBucket: "absen-kelas8.firebasestorage.app",
+  messagingSenderId: "636560501063",
+  appId: "1:636560501063:web:4384206e2a3cd94151c462"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+window.login = async function() {
+  const email = document.getElementById('email').value.trim();
+  const pass = document.getElementById('pass').value;
+  const err = document.getElementById('err');
+  const btn = document.getElementById('btn-login');
+  if(!email||!pass){err.textContent='Email dan password wajib diisi';err.style.display='block';return;}
+  btn.textContent='Memuat...';btn.disabled=true;
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+    window.location.href='admin.html';
+  } catch(e) {
+    let msg = 'Login gagal. Periksa email dan password.';
+    if(e.code==='auth/user-not-found'||e.code==='auth/wrong-password'||e.code==='auth/invalid-credential') msg='Email atau password salah.';
+    if(e.code==='auth/too-many-requests') msg='Terlalu banyak percobaan. Coba lagi nanti.';
+    err.textContent=msg;err.style.display='block';
+    btn.textContent='Masuk';btn.disabled=false;
+  }
+};
+</script>
+</body>
+</html>

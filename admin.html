@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Absensi</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--surface:#fff;--border:#e2e0d8;
+  --text:#1a1917;--muted:#6b6963;--hint:#c0bdb6;
+  --green:#1d7a4a;--green-bg:#e3f5ec;--green-bdr:#9fdfc0;
+  --red:#a3201e;--red-bg:#fce8e8;--red-bdr:#f4a9a8;
+  --amber:#8a5a00;--amber-bg:#fdf0d5;--amber-bdr:#f0c97a;
+  --blue:#1a5fb4;--blue-bg:#e8f0fc;--blue-bdr:#a8c4f0;
+  --gray:#f1f0eb;--r:10px;--rl:14px;
+}
+html.dark{
+  --bg:#0f1117;--surface:#1a1d27;--border:#2a2d3e;
+  --text:#f0f2ff;--muted:#7c82a8;--hint:#3a3f5c;
+  --green:#3dd68c;--green-bg:rgba(61,214,140,.15);--green-bdr:rgba(61,214,140,.3);
+  --red:#f75f5f;--red-bg:rgba(247,95,95,.15);--red-bdr:rgba(247,95,95,.3);
+  --amber:#f5a623;--amber-bg:rgba(245,166,35,.15);--amber-bdr:rgba(245,166,35,.3);
+  --blue:#4f8ef7;--blue-bg:rgba(79,142,247,.15);--blue-bdr:rgba(79,142,247,.3);
+  --gray:rgba(255,255,255,.05);
+}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .2s,color .2s}
+#auth-guard{display:none}
+.layout{max-width:1000px;margin:0 auto;padding:1.25rem 1rem}
+.nav{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:.875rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.nav-l{display:flex;align-items:center;gap:10px}
+.nav-icon{width:34px;height:34px;background:var(--text);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.nav-title{font-size:15px;font-weight:700}
+.nav-sub{font-size:11px;color:var(--muted)}
+.nav-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.clock{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:5px;margin-bottom:1rem;flex-wrap:wrap}
+.tab{padding:7px 16px;border:1px solid var(--border);border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--muted);transition:all .15s;font-family:'Plus Jakarta Sans',sans-serif}
+.tab:hover{background:var(--gray)}
+.tab.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+.panel{display:none}.panel.active{display:block}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:1.125rem 1.25rem;margin-bottom:1rem}
+.card h3{font-size:14px;font-weight:700;margin-bottom:12px}
+.btn{padding:7px 14px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;white-space:nowrap}
+.btn:hover{background:var(--gray)}
+.btn-dark{background:var(--text);color:var(--bg);border-color:var(--text)}.btn-dark:hover{opacity:.85}
+.btn-blue{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-bdr)}
+.btn-red{background:var(--red-bg);color:var(--red);border-color:var(--red-bdr)}
+.btn-green{background:var(--green-bg);color:var(--green);border-color:var(--green-bdr)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.inp{width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;background:var(--surface);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;outline:none}
+.inp:focus{border-color:var(--muted)}
+label{font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.frow3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.fone{margin-bottom:10px}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+th{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);font-weight:700;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text);word-break:break-word;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--gray)}
+.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700}
+.b-hadir{background:var(--green-bg);color:var(--green)}
+.b-terlambat{background:var(--amber-bg);color:var(--amber)}
+.b-izin{background:var(--blue-bg);color:var(--blue)}
+.b-sakit{background:var(--amber-bg);color:var(--amber)}
+.b-alfa{background:var(--red-bg);color:var(--red)}
+.b-belum{background:var(--gray);color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center}
+.stat-num{font-size:26px;font-weight:700}
+.stat-lbl{font-size:11px;color:var(--muted);margin-top:3px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.s-h{color:var(--green)}.s-i{color:var(--blue)}.s-s{color:var(--amber)}.s-a{color:var(--red)}
+.alert{padding:10px 14px;border-radius:var(--r);font-size:13px;font-weight:600;margin-bottom:12px;display:none;border:1px solid transparent}
+.a-ok{background:var(--green-bg);color:var(--green);border-color:var(--green-bdr)}
+.a-err{background:var(--red-bg);color:var(--red);border-color:var(--red-bdr)}
+.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
+.qr-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;align-items:center;gap:7px}
+.qr-card canvas{border-radius:6px;border:1px solid var(--border)}
+.qr-name{font-size:13px;font-weight:700;text-align:center}
+.qr-kelas{font-size:11px;color:var(--muted)}
+.qr-btns{display:flex;gap:5px}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;padding:1rem}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--rl);padding:1.5rem;width:100%;max-width:440px;border:1px solid var(--border)}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:16px}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.tbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.filter-row{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:flex-end}
+.filter-row input,.filter-row select{padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;background:var(--surface);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;outline:none}
+.persen-bar{height:6px;background:var(--gray);border-radius:99px;margin-top:4px;overflow:hidden}
+.persen-fill{height:100%;border-radius:99px;transition:width .3s}
+@media print{
+  body *{visibility:hidden}
+  #print-area,#print-area *{visibility:visible}
+  #print-area{position:fixed;inset:0;background:#fff;display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:20px;align-content:start}
+  .print-qr-item{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px;border:1px solid #ccc;border-radius:8px;page-break-inside:avoid}
+  .print-qr-name{font-size:13px;font-weight:700;text-align:center;font-family:sans-serif}
+  .print-qr-kelas{font-size:11px;color:#666;font-family:sans-serif}
+}
+@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}.frow,.frow3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="print-area" style="display:none"></div>
+<div id="auth-guard">
+<div class="layout">
+
+  <div class="nav">
+    <div class="nav-l">
+      <div class="nav-icon">🏫</div>
+      <div><div class="nav-title">Admin — Absensi</div><div class="nav-sub" id="admin-email">—</div></div>
+    </div>
+    <div class="nav-r">
+      <div class="clock" id="jam">00:00:00</div>
+      <button class="btn" onclick="toggleDark()" id="dark-toggle" style="padding:6px 10px;font-size:15px">🌙</button>
+      <a href="index.html" class="btn btn-sm">Halaman Scan</a>
+      <button class="btn btn-sm btn-red" onclick="doLogout()">Keluar</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="sw('kelas')">Kelas &amp; Siswa</button>
+    <button class="tab" onclick="sw('rekap')">Rekap Absen</button>
+    <button class="tab" onclick="sw('edit')">Edit Absen</button>
+    <button class="tab" onclick="sw('izin')">Izin / Sakit</button>
+    <button class="tab" onclick="sw('statistik')">Statistik</button>
+  </div>
+
+  <!-- KELAS & SISWA -->
+  <div id="tab-kelas" class="panel active">
+    <div class="frow">
+      <div class="card">
+        <h3>Tambah kelas baru</h3>
+        <div id="alert-kelas" class="alert"></div>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="inp-kelas-baru" placeholder="Contoh: Kelas 8A" onkeydown="if(event.key==='Enter')tambahKelas()">
+          <button class="btn btn-dark" onclick="tambahKelas()">+ Tambah</button>
+        </div>
+        <div style="margin-top:14px" id="list-kelas"></div>
+      </div>
+      <div class="card">
+        <h3>Tambah siswa</h3>
+        <div id="alert-siswa" class="alert"></div>
+        <div class="fone"><label>Kelas</label><select class="inp" id="sel-kelas-siswa"><option value="">-- Pilih kelas --</option></select></div>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="inp-nama-siswa" placeholder="Nama siswa..." onkeydown="if(event.key==='Enter')tambahSiswa()">
+          <button class="btn btn-dark" onclick="tambahSiswa()">+ Tambah</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="tbar">
+        <h3>QR Code permanen</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <select class="inp" style="width:auto;padding:6px 10px" id="sel-kelas-qr" onchange="renderQRGrid()"><option value="">-- Semua kelas --</option></select>
+          <button class="btn btn-blue" onclick="unduhSemuaQR()">Unduh Semua</button>
+          <button class="btn btn-green" onclick="printSemuaQR()">Print QR</button>
+        </div>
+      </div>
+      <div class="qr-grid" id="qr-grid"><p style="color:var(--hint);font-size:13px">Memuat...</p></div>
+    </div>
+  </div>
+
+  <!-- REKAP -->
+  <div id="tab-rekap" class="panel">
+    <div class="filter-row">
+      <div><label>Kelas</label><select class="inp" style="width:auto" id="rek-kelas" onchange="loadRekap()"><option value="">Semua kelas</option></select></div>
+      <div><label>Tanggal</label><input type="date" id="rek-tgl" onchange="loadRekap()"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-self:flex-end">
+        <button class="btn btn-dark" onclick="markAlfa()">Tandai Alfa</button>
+        <button class="btn btn-green" onclick="exportExcel()">Export Excel</button>
+        <button class="btn btn-blue" onclick="exportPDF()">Export PDF</button>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-num s-h" id="cnt-h">0</div><div class="stat-lbl">Hadir</div></div>
+      <div class="stat"><div class="stat-num s-i" id="cnt-i">0</div><div class="stat-lbl">Izin</div></div>
+      <div class="stat"><div class="stat-num s-s" id="cnt-s">0</div><div class="stat-lbl">Sakit</div></div>
+      <div class="stat"><div class="stat-num s-a" id="cnt-a">0</div><div class="stat-lbl">Alfa</div></div>
+    </div>
+    <div class="card">
+      <div class="tbar">
+        <h3>Rekap kehadiran</h3>
+        <input class="inp" style="width:180px" placeholder="Cari nama..." id="rek-cari" oninput="filterRekap()">
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th style="width:36px">No</th><th>Nama</th><th style="width:90px">Kelas</th><th style="width:85px">Jam</th><th style="width:105px">Status</th></tr></thead>
+        <tbody id="tbl-rekap"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- EDIT -->
+  <div id="tab-edit" class="panel">
+    <div class="card">
+      <h3>Cari &amp; edit data absen</h3>
+      <div class="filter-row">
+        <div><label>Kelas</label><select class="inp" style="width:auto" id="edit-kelas" onchange="loadEditData()"><option value="">Semua kelas</option></select></div>
+        <div><label>Tanggal</label><input type="date" id="edit-tgl" onchange="loadEditData()"></div>
+        <div style="align-self:flex-end"><input class="inp" style="width:180px" placeholder="Cari nama..." id="edit-cari" oninput="filterEditTable()"></div>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Nama</th><th style="width:90px">Kelas</th><th style="width:85px">Jam</th><th style="width:105px">Status</th><th style="width:100px">Aksi</th></tr></thead>
+        <tbody id="tbl-edit"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- IZIN/SAKIT -->
+  <div id="tab-izin" class="panel">
+    <div class="card">
+      <h3>Tambah izin / sakit</h3>
+      <div id="alert-izin" class="alert"></div>
+      <div class="frow3">
+        <div><label>Kelas</label><select class="inp" id="iz-kelas" onchange="populateSiswaSelect()"><option value="">-- Kelas --</option></select></div>
+        <div><label>Nama Siswa</label><select class="inp" id="iz-nama"><option value="">-- Pilih --</option></select></div>
+        <div><label>Jenis</label><select class="inp" id="iz-jenis"><option>Izin</option><option>Sakit</option></select></div>
+      </div>
+      <div class="frow">
+        <div><label>Tanggal Mulai</label><input type="date" class="inp" id="iz-tgl1"></div>
+        <div><label>Tanggal Selesai</label><input type="date" class="inp" id="iz-tgl2"></div>
+      </div>
+      <div class="fone"><label>Keterangan</label><textarea class="inp" id="iz-ket" rows="2" placeholder="Keterangan..."></textarea></div>
+      <button class="btn btn-dark" onclick="tambahIzin()">Simpan</button>
+    </div>
+    <div class="card">
+      <h3>Tabel izin &amp; sakit</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Nama</th><th style="width:70px">Jenis</th><th style="width:95px">Mulai</th><th style="width:95px">Selesai</th><th>Keterangan</th><th style="width:95px">Aksi</th></tr></thead>
+        <tbody id="tbl-izin"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- STATISTIK -->
+  <div id="tab-statistik" class="panel">
+    <div class="filter-row">
+      <div><label>Kelas</label><select class="inp" style="width:auto" id="stat-kelas" onchange="loadStatistik()"><option value="">Semua kelas</option></select></div>
+      <div><label>Bulan</label><input type="month" id="stat-bulan" onchange="loadStatistik()"></div>
+      <div style="align-self:flex-end"><button class="btn btn-green" onclick="exportExcelStat()">Export Excel</button></div>
+    </div>
+    <div class="card">
+      <h3>Persentase kehadiran per siswa</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th style="width:36px">No</th><th>Nama</th><th style="width:90px">Kelas</th><th style="width:55px">Hadir</th><th style="width:55px">Izin</th><th style="width:55px">Sakit</th><th style="width:55px">Alfa</th><th style="width:140px">Kehadiran</th></tr></thead>
+        <tbody id="tbl-stat"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+</div></div>
+
+<!-- MODAL EDIT ABSEN -->
+<div class="modal-bg" id="modal-edit">
+  <div class="modal">
+    <h3>Edit Data Absen</h3>
+    <input type="hidden" id="edit-doc-id">
+    <div class="fone"><label>Nama</label><input class="inp" id="edit-nama-val" readonly style="background:var(--gray)"></div>
+    <div class="frow">
+      <div><label>Jam Absen</label><input type="time" class="inp" id="edit-jam-val"></div>
+      <div><label>Status</label><select class="inp" id="edit-status-val"><option>Hadir</option><option>Terlambat</option><option>Alfa</option><option>Izin</option><option>Sakit</option></select></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('modal-edit')">Batal</button>
+      <button class="btn btn-dark" onclick="simpanEdit()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT IZIN -->
+<div class="modal-bg" id="modal-izin">
+  <div class="modal">
+    <h3>Edit Izin / Sakit</h3>
+    <input type="hidden" id="iz-edit-id">
+    <div class="frow">
+      <div><label>Nama</label><input class="inp" id="iz-edit-nama" readonly style="background:var(--gray)"></div>
+      <div><label>Jenis</label><select class="inp" id="iz-edit-jenis"><option>Izin</option><option>Sakit</option></select></div>
+    </div>
+    <div class="frow">
+      <div><label>Tgl Mulai</label><input type="date" class="inp" id="iz-edit-tgl1"></div>
+      <div><label>Tgl Selesai</label><input type="date" class="inp" id="iz-edit-tgl2"></div>
+    </div>
+    <div class="fone"><label>Keterangan</label><textarea class="inp" id="iz-edit-ket" rows="2"></textarea></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('modal-izin')">Batal</button>
+      <button class="btn btn-dark" onclick="simpanEditIzin()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig={apiKey:"AIzaSyDlCnUvgyDT-oTfJJ-nxcPWkhpY_b6JeBw",authDomain:"absen-kelas8.firebaseapp.com",projectId:"absen-kelas8",storageBucket:"absen-kelas8.firebasestorage.app",messagingSenderId:"636560501063",appId:"1:636560501063:web:4384206e2a3cd94151c462"};
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+function pad(n){return String(n).padStart(2,'0')}
+function todayStr(){const n=new Date();return`${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`}
+function nowMonth(){const n=new Date();return`${n.getFullYear()}-${pad(n.getMonth()+1)}`}
+let kelasList=[],siswaList=[],rekapData=[],editDataAll=[];
+
+window.toggleDark=function(){const d=document.documentElement.classList.toggle('dark');localStorage.setItem('dark',d?'1':'0');document.getElementById('dark-toggle').textContent=d?'☀️':'🌙';};
+if(localStorage.getItem('dark')==='1'){document.documentElement.classList.add('dark');document.getElementById('dark-toggle').textContent='☀️';}
+function updateClock(){const n=new Date();document.getElementById('jam').textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;}
+setInterval(updateClock,1000);updateClock();
+
+onAuthStateChanged(auth,user=>{
+  if(!user){window.location.href='login.html';return;}
+  document.getElementById('auth-guard').style.display='block';
+  document.getElementById('admin-email').textContent=user.email;
+  init();
+});
+window.doLogout=async()=>{await signOut(auth);window.location.href='login.html';};
+
+async function init(){
+  document.getElementById('rek-tgl').value=todayStr();
+  document.getElementById('edit-tgl').value=todayStr();
+  document.getElementById('stat-bulan').value=nowMonth();
+  await loadKelas();await loadSiswa();loadRekap();
+}
+
+window.sw=function(t){
+  ['kelas','rekap','edit','izin','statistik'].forEach((n,i)=>document.querySelectorAll('.tab')[i].classList.toggle('active',n===t));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  if(t==='rekap')loadRekap();if(t==='edit')loadEditData();
+  if(t==='izin'){loadIzin();populateSiswaSelect();}if(t==='statistik')loadStatistik();if(t==='kelas')renderQRGrid();
+};
+
+async function loadKelas(){
+  const snap=await getDocs(collection(db,'kelas'));
+  kelasList=[];snap.forEach(d=>kelasList.push({id:d.id,...d.data()}));
+  kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
+  const opts=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
+  ['rek-kelas','edit-kelas','stat-kelas'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">Semua kelas</option>'+opts;});
+  ['sel-kelas-siswa','iz-kelas'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">-- Pilih kelas --</option>'+opts;});
+  const qs=document.getElementById('sel-kelas-qr');if(qs)qs.innerHTML='<option value="">-- Semua kelas --</option>'+opts;
+  renderListKelas();
+}
+function renderListKelas(){
+  const el=document.getElementById('list-kelas');
+  if(!kelasList.length){el.innerHTML='<p style="font-size:13px;color:var(--muted)">Belum ada kelas</p>';return;}
+  el.innerHTML=kelasList.map(k=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px;font-weight:600">${k.nama}</span><button class="btn btn-sm btn-red" onclick="hapusKelas('${k.id}','${k.nama}')">Hapus</button></div>`).join('');
+}
+window.tambahKelas=async function(){
+  const nama=document.getElementById('inp-kelas-baru').value.trim(),box=document.getElementById('alert-kelas');
+  if(!nama){showAlert(box,'Nama kelas kosong','err');return;}
+  if(kelasList.find(k=>k.nama.toLowerCase()===nama.toLowerCase())){showAlert(box,'Kelas sudah ada','err');return;}
+  const ref=await addDoc(collection(db,'kelas'),{nama,createdAt:Timestamp.now()});
+  kelasList.push({id:ref.id,nama});kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
+  document.getElementById('inp-kelas-baru').value='';
+  showAlert(box,`Kelas "${nama}" ditambahkan`,'ok');
+  const opts=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
+  ['rek-kelas','edit-kelas','stat-kelas'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">Semua kelas</option>'+opts;});
+  ['sel-kelas-siswa','iz-kelas'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">-- Pilih kelas --</option>'+opts;});
+  const qs=document.getElementById('sel-kelas-qr');if(qs)qs.innerHTML='<option value="">-- Semua kelas --</option>'+opts;
+  renderListKelas();
+};
+window.hapusKelas=async function(id,nama){
+  if(!confirm(`Hapus kelas "${nama}"?`))return;
+  await deleteDoc(doc(db,'kelas',id));kelasList=kelasList.filter(k=>k.id!==id);
+  const opts=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
+  ['rek-kelas','edit-kelas','stat-kelas'].forEach(id2=>{const el=document.getElementById(id2);if(el)el.innerHTML='<option value="">Semua kelas</option>'+opts;});
+  ['sel-kelas-siswa','iz-kelas'].forEach(id2=>{const el=document.getElementById(id2);if(el)el.innerHTML='<option value="">-- Pilih kelas --</option>'+opts;});
+  renderListKelas();
+};
+
+async function loadSiswa(){
+  const snap=await getDocs(collection(db,'siswa'));
+  siswaList=[];snap.forEach(d=>siswaList.push({id:d.id,...d.data()}));
+  siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));renderQRGrid();
+}
+window.tambahSiswa=async function(){
+  const kelasId=document.getElementById('sel-kelas-siswa').value,nama=document.getElementById('inp-nama-siswa').value.trim(),box=document.getElementById('alert-siswa');
+  if(!kelasId){showAlert(box,'Pilih kelas dulu','err');return;}
+  if(!nama){showAlert(box,'Nama tidak boleh kosong','err');return;}
+  if(siswaList.find(s=>s.nama.toLowerCase()===nama.toLowerCase()&&s.kelasId===kelasId)){showAlert(box,'Siswa sudah ada di kelas ini','err');return;}
+  const kelasNama=kelasList.find(k=>k.id===kelasId)?.nama||'';
+  const ref=await addDoc(collection(db,'siswa'),{nama,kelasId,kelasNama,createdAt:Timestamp.now()});
+  siswaList.push({id:ref.id,nama,kelasId,kelasNama});siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));
+  document.getElementById('inp-nama-siswa').value='';
+  showAlert(box,`${nama} ditambahkan ke ${kelasNama}`,'ok');renderQRGrid();
+};
+
+window.renderQRGrid=function(){
+  const fk=document.getElementById('sel-kelas-qr')?.value||'';
+  const filtered=fk?siswaList.filter(s=>s.kelasId===fk):siswaList;
+  const grid=document.getElementById('qr-grid');
+  if(!filtered.length){grid.innerHTML='<p style="color:var(--hint);font-size:13px">Belum ada siswa</p>';return;}
+  grid.innerHTML='';
+  filtered.forEach(s=>{
+    const div=document.createElement('div');div.className='qr-card';
+    const canv=document.createElement('canvas');canv.width=120;canv.height=120;canv.dataset.nama=s.nama;div.appendChild(canv);
+    const nm=document.createElement('div');nm.className='qr-name';nm.textContent=s.nama;div.appendChild(nm);
+    if(s.kelasNama){const kl=document.createElement('div');kl.className='qr-kelas';kl.textContent=s.kelasNama;div.appendChild(kl);}
+    const btns=document.createElement('div');btns.className='qr-btns';
+    const dl=document.createElement('button');dl.className='btn btn-sm btn-blue';dl.textContent='Unduh';
+    dl.onclick=()=>setTimeout(()=>{const a=document.createElement('a');a.download=`QR-${s.nama}.png`;a.href=canv.toDataURL();a.click();},400);
+    const db2=document.createElement('button');db2.className='btn btn-sm btn-red';db2.textContent='Hapus';
+    db2.onclick=()=>hapusSiswa(s.id,s.nama);btns.appendChild(dl);btns.appendChild(db2);div.appendChild(btns);
+    grid.appendChild(div);setTimeout(()=>drawQR(canv,`ABSEN|KELAS8|${s.nama}`),80);
+  });
+};
+window.unduhSemuaQR=function(){
+  const cs=document.querySelectorAll('#qr-grid canvas');if(!cs.length){alert('Belum ada QR');return;}
+  cs.forEach((c,i)=>setTimeout(()=>{const a=document.createElement('a');a.download=`QR-${c.dataset.nama||i+1}.png`;a.href=c.toDataURL();a.click();},i*300));
+};
+window.printSemuaQR=function(){
+  const fk=document.getElementById('sel-kelas-qr')?.value||'';
+  const filtered=fk?siswaList.filter(s=>s.kelasId===fk):siswaList;
+  const area=document.getElementById('print-area');area.style.display='grid';
+  area.innerHTML=filtered.map(s=>`<div class="print-qr-item" id="pqr-${s.id}"><div class="print-qr-name">${s.nama}</div><div class="print-qr-kelas">${s.kelasNama||''}</div></div>`).join('');
+  filtered.forEach(s=>{
+    const div=document.getElementById(`pqr-${s.id}`);
+    const c=document.createElement('canvas');c.width=120;c.height=120;div.insertBefore(c,div.firstChild);
+    setTimeout(()=>drawQR(c,`ABSEN|KELAS8|${s.nama}`),100);
+  });
+  setTimeout(()=>{window.print();area.style.display='none';},900);
+};
+async function hapusSiswa(id,nama){if(!confirm(`Hapus "${nama}"?`))return;await deleteDoc(doc(db,'siswa',id));siswaList=siswaList.filter(s=>s.id!==id);renderQRGrid();}
+function drawQR(canvas,text){
+  const tmp=document.createElement('div');tmp.style.cssText='position:absolute;left:-9999px';document.body.appendChild(tmp);
+  try{new QRCode(tmp,{text,width:120,height:120,colorDark:'#1a1917',colorLight:'#ffffff'});
+    setTimeout(()=>{const el=tmp.querySelector('canvas')||tmp.querySelector('img');if(el){const ctx=canvas.getContext('2d');if(el.tagName==='CANVAS'){ctx.drawImage(el,0,0,120,120);}else{const img=new Image();img.onload=()=>ctx.drawImage(img,0,0,120,120);img.src=el.src;}}try{document.body.removeChild(tmp);}catch(e){}},350);
+  }catch(e){try{document.body.removeChild(tmp);}catch(x){}}
+}
+
+window.loadRekap=async function(){
+  const tgl=document.getElementById('rek-tgl').value||todayStr(),kelasId=document.getElementById('rek-kelas').value;
+  let targets=kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList;
+  const as=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));
+  const am={};as.forEach(d=>am[d.data().nama]={...d.data(),id:d.id});
+  const isSnap=await getDocs(collection(db,'izin'));
+  const im={};isSnap.forEach(d=>{const dd=d.data();if(dd.tgl1<=tgl&&tgl<=dd.tgl2)im[dd.nama]=dd;});
+  let h=0,i=0,s=0,a=0;
+  rekapData=targets.map((sw,idx)=>{
+    const iz=im[sw.nama],ab=am[sw.nama];let st='Belum absen',jam='-';
+    if(iz){st=iz.jenis;iz.jenis==='Izin'?i++:s++;}else if(ab){jam=ab.jamStr;st=ab.status;st==='Alfa'?a++:h++;}
+    return{no:idx+1,nama:sw.nama,kelas:sw.kelasNama||'-',jam,status:st};
+  });
+  document.getElementById('cnt-h').textContent=h;document.getElementById('cnt-i').textContent=i;
+  document.getElementById('cnt-s').textContent=s;document.getElementById('cnt-a').textContent=a;
+  renderRekapTable(rekapData);
+};
+function renderRekapTable(data){
+  document.getElementById('tbl-rekap').innerHTML=data.map(d=>`<tr><td>${d.no}</td><td>${d.nama}</td><td>${d.kelas}</td><td>${d.jam}</td><td><span class="badge ${bc(d.status)}">${d.status}</span></td></tr>`).join('');
+}
+window.filterRekap=function(){const q=document.getElementById('rek-cari').value.toLowerCase();renderRekapTable(q?rekapData.filter(d=>d.nama.toLowerCase().includes(q)):rekapData);};
+window.markAlfa=async function(){
+  const tgl=document.getElementById('rek-tgl').value||todayStr();
+  const as=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));const am={};as.forEach(d=>am[d.data().nama]=true);
+  const isSnap2=await getDocs(collection(db,'izin'));const im={};isSnap2.forEach(d=>{const dd=d.data();if(dd.tgl1<=tgl&&tgl<=dd.tgl2)im[dd.nama]=true;});
+  const kelasId=document.getElementById('rek-kelas').value;
+  const targets=kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList;
+  await Promise.all(targets.filter(s=>!am[s.nama]&&!im[s.nama]).map(s=>addDoc(collection(db,'absensi'),{nama:s.nama,kelasId:s.kelasId,tanggal:tgl,jamStr:'-',status:'Alfa',waktu:Timestamp.now()})));
+  loadRekap();
+};
+window.exportExcel=function(){
+  if(!rekapData.length){alert('Tidak ada data');return;}
+  const tgl=document.getElementById('rek-tgl').value||todayStr();
+  const ws=XLSX.utils.json_to_sheet(rekapData.map(d=>({'No':d.no,'Nama':d.nama,'Kelas':d.kelas,'Jam Absen':d.jam,'Status':d.status})));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,`Rekap ${tgl}`);XLSX.writeFile(wb,`Rekap_Absen_${tgl}.xlsx`);
+};
+window.exportPDF=function(){
+  if(!rekapData.length){alert('Tidak ada data');return;}
+  const tgl=document.getElementById('rek-tgl').value||todayStr();
+  const html=`<html><head><style>body{font-family:sans-serif;padding:24px;font-size:13px}h2{margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px 10px;text-align:left}th{background:#f5f5f5;font-weight:700}</style></head><body><h2>Rekap Absensi — ${tgl}</h2><table><thead><tr><th>No</th><th>Nama</th><th>Kelas</th><th>Jam</th><th>Status</th></tr></thead><tbody>${rekapData.map(d=>`<tr><td>${d.no}</td><td>${d.nama}</td><td>${d.kelas}</td><td>${d.jam}</td><td>${d.status}</td></tr>`).join('')}</tbody></table></body></html>`;
+  const w=window.open('','_blank');w.document.write(html);w.document.close();w.print();
+};
+
+window.loadEditData=async function(){
+  const tgl=document.getElementById('edit-tgl').value||todayStr(),kelasId=document.getElementById('edit-kelas').value;
+  const snap=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));
+  editDataAll=[];snap.forEach(d=>editDataAll.push({id:d.id,...d.data()}));
+  if(kelasId)editDataAll=editDataAll.filter(d=>d.kelasId===kelasId);
+  editDataAll.sort((a,b)=>a.nama.localeCompare(b.nama));renderEditTable(editDataAll);
+};
+function renderEditTable(data){
+  const tb=document.getElementById('tbl-edit');
+  if(!data.length){tb.innerHTML='<tr><td colspan="5" style="color:var(--hint);text-align:center;padding:16px">Tidak ada data</td></tr>';return;}
+  tb.innerHTML=data.map(d=>`<tr><td>${d.nama}</td><td>${d.kelasNama||siswaList.find(s=>s.kelasId===d.kelasId)?.kelasNama||'-'}</td><td>${d.jamStr||'-'}</td><td><span class="badge ${bc(d.status)}">${d.status}</span></td><td style="display:flex;gap:5px"><button class="btn btn-sm btn-blue" onclick="openEditModal('${d.id}','${d.nama}','${d.jamStr||''}','${d.status}')">Edit</button><button class="btn btn-sm btn-red" onclick="hapusAbsen('${d.id}')">Hapus</button></td></tr>`).join('');
+}
+window.filterEditTable=function(){const q=document.getElementById('edit-cari').value.toLowerCase();renderEditTable(q?editDataAll.filter(d=>d.nama.toLowerCase().includes(q)):editDataAll);};
+window.openEditModal=function(id,nama,jam,status){
+  document.getElementById('edit-doc-id').value=id;document.getElementById('edit-nama-val').value=nama;
+  document.getElementById('edit-jam-val').value=jam;document.getElementById('edit-status-val').value=status;
+  document.getElementById('modal-edit').classList.add('open');
+};
+window.simpanEdit=async function(){
+  const id=document.getElementById('edit-doc-id').value;
+  await updateDoc(doc(db,'absensi',id),{jamStr:document.getElementById('edit-jam-val').value,status:document.getElementById('edit-status-val').value});
+  closeModal('modal-edit');loadEditData();
+};
+window.hapusAbsen=async function(id){if(!confirm('Hapus data absen ini?'))return;await deleteDoc(doc(db,'absensi',id));loadEditData();};
+
+window.populateSiswaSelect=function(){
+  const kelasId=document.getElementById('iz-kelas').value;
+  const filtered=kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList;
+  document.getElementById('iz-nama').innerHTML='<option value="">-- Pilih --</option>'+filtered.map(s=>`<option>${s.nama}</option>`).join('');
+};
+window.tambahIzin=async function(){
+  const nama=document.getElementById('iz-nama').value,jenis=document.getElementById('iz-jenis').value;
+  const tgl1=document.getElementById('iz-tgl1').value,tgl2=document.getElementById('iz-tgl2').value;
+  const ket=document.getElementById('iz-ket').value,box=document.getElementById('alert-izin');
+  if(!nama||!tgl1||!tgl2){showAlert(box,'Pilih siswa dan tanggal','err');return;}
+  await addDoc(collection(db,'izin'),{nama,jenis,tgl1,tgl2,ket,createdAt:Timestamp.now()});
+  document.getElementById('iz-ket').value='';showAlert(box,`Data ${jenis} ${nama} disimpan`,'ok');loadIzin();
+};
+async function loadIzin(){
+  const snap=await getDocs(collection(db,'izin'));
+  const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));rows.sort((a,b)=>b.tgl1.localeCompare(a.tgl1));
+  const tb=document.getElementById('tbl-izin');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="6" style="color:var(--hint);text-align:center;padding:16px">Belum ada data</td></tr>';return;}
+  tb.innerHTML=rows.map(d=>`<tr><td>${d.nama}</td><td><span class="badge ${d.jenis==='Izin'?'b-izin':'b-sakit'}">${d.jenis}</span></td><td>${d.tgl1}</td><td>${d.tgl2}</td><td style="color:var(--muted)">${d.ket||'-'}</td><td style="display:flex;gap:5px"><button class="btn btn-sm btn-blue" onclick="openEditIzin('${d.id}','${d.nama}','${d.jenis}','${d.tgl1}','${d.tgl2}','${(d.ket||'').replace(/'/g,'')}')">Edit</button><button class="btn btn-sm btn-red" onclick="hapusIzin('${d.id}')">Hapus</button></td></tr>`).join('');
+}
+window.openEditIzin=function(id,nama,jenis,tgl1,tgl2,ket){
+  ['iz-edit-id','iz-edit-nama','iz-edit-tgl1','iz-edit-tgl2','iz-edit-ket'].forEach((el,i)=>document.getElementById(el).value=[id,nama,tgl1,tgl2,ket][i]);
+  document.getElementById('iz-edit-jenis').value=jenis;document.getElementById('modal-izin').classList.add('open');
+};
+window.simpanEditIzin=async function(){
+  const id=document.getElementById('iz-edit-id').value;
+  await updateDoc(doc(db,'izin',id),{jenis:document.getElementById('iz-edit-jenis').value,tgl1:document.getElementById('iz-edit-tgl1').value,tgl2:document.getElementById('iz-edit-tgl2').value,ket:document.getElementById('iz-edit-ket').value});
+  closeModal('modal-izin');loadIzin();
+};
+window.hapusIzin=async function(id){if(!confirm('Hapus data izin?'))return;await deleteDoc(doc(db,'izin',id));loadIzin();};
+
+window.loadStatistik=async function(){
+  const bulan=document.getElementById('stat-bulan').value||nowMonth(),kelasId=document.getElementById('stat-kelas').value;
+  const [yr,mo]=bulan.split('-').map(Number),days=new Date(yr,mo,0).getDate();
+  const targets=kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList;
+  const asAll=await getDocs(collection(db,'absensi'));
+  const as={docs:[]};asAll.forEach(d=>{const dd=d.data();if(dd.tanggal&&dd.tanggal.startsWith(bulan))as.docs.push({data:()=>dd});});
+  const is=await getDocs(collection(db,'izin'));
+  const am={};as.docs.forEach(d=>{const dd=d.data();if(!am[dd.nama])am[dd.nama]=[];am[dd.nama].push(dd);});
+  const il=[];is.forEach(d=>il.push(d.data()));
+  function countDays(arr,jenis){return arr.filter(i=>i.jenis===jenis).reduce((acc,i)=>{const d1=new Date(i.tgl1),d2=new Date(i.tgl2);for(let d=new Date(d1);d<=d2;d.setDate(d.getDate()+1)){const ds=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;if(ds.startsWith(bulan))acc++;}return acc;},0);}
+  const statData=targets.map((s,idx)=>{
+    const abs=am[s.nama]||[],sil=il.filter(i=>i.nama===s.nama);
+    const h=abs.filter(a=>a.status==='Hadir'||a.status==='Terlambat').length;
+    const a=abs.filter(a=>a.status==='Alfa').length;
+    const iz=countDays(sil,'Izin'),sk=countDays(sil,'Sakit');
+    const total=h+a+iz+sk||1,pct=Math.round((h/total)*100);
+    return{no:idx+1,nama:s.nama,kelas:s.kelasNama||'-',h,iz,sk,a,pct};
+  });
+  document.getElementById('tbl-stat').innerHTML=statData.map(d=>`<tr><td>${d.no}</td><td>${d.nama}</td><td>${d.kelas}</td><td style="color:var(--green);font-weight:700">${d.h}</td><td style="color:var(--blue)">${d.iz}</td><td style="color:var(--amber)">${d.sk}</td><td style="color:var(--red)">${d.a}</td><td><div style="font-size:12px;font-weight:700;margin-bottom:3px">${d.pct}%</div><div class="persen-bar"><div class="persen-fill" style="width:${d.pct}%;background:${d.pct>=80?'var(--green)':d.pct>=60?'var(--amber)':'var(--red)'}"></div></div></td></tr>`).join('');
+  window._statData=statData;
+};
+window.exportExcelStat=function(){
+  if(!window._statData?.length){alert('Tidak ada data');return;}
+  const ws=XLSX.utils.json_to_sheet(window._statData.map(d=>({'No':d.no,'Nama':d.nama,'Kelas':d.kelas,'Hadir':d.h,'Izin':d.iz,'Sakit':d.sk,'Alfa':d.a,'Kehadiran':d.pct+'%'})));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Statistik');XLSX.writeFile(wb,'Statistik_Kehadiran.xlsx');
+};
+
+function bc(st){if(st==='Hadir')return'b-hadir';if(st==='Terlambat')return'b-terlambat';if(st==='Alfa')return'b-alfa';if(st==='Izin')return'b-izin';if(st==='Sakit')return'b-sakit';return'b-belum';}
+function showAlert(el,msg,type){el.textContent=msg;el.className='alert '+(type==='ok'?'a-ok':'a-err');el.style.display='block';setTimeout(()=>el.style.display='none',3500);}
+window.closeModal=function(id){document.getElementById(id).classList.remove('open');};
+</script>
+</body>
+</html>
