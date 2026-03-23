@@ -1,4 +1,4 @@
-const CACHE='absen-v1';
+const CACHE='absen-v3';
 const FILES=[
   '/absen-kelas8/index.html',
   '/absen-kelas8/admin.html',

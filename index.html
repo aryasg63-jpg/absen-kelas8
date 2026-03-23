@@ -326,21 +326,47 @@ window.addEventListener('offline',()=>updateOnlineBar());
 
 async function loadKelas(){
   const sel=document.getElementById('sel-kelas');
-  try{
-    const snap=await getDocs(collection(db,'kelas'));
-    kelasList=[];snap.forEach(d=>kelasList.push({id:d.id,...d.data()}));
-    kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
-    // Cache ke localStorage
-    localStorage.setItem('cache_kelas',JSON.stringify(kelasList));
-  }catch(e){
-    // Coba cache index dulu, fallback ke cache admin
-    const cached=localStorage.getItem('cache_kelas')||localStorage.getItem('adm_cache_kelas');
-    if(cached){kelasList=JSON.parse(cached);}
+
+  // Bersihkan cache kosong dari sesi lama
+  ['cache_kelas','adm_cache_kelas'].forEach(k=>{
+    const v=localStorage.getItem(k);
+    if(v){try{if(!JSON.parse(v).length)localStorage.removeItem(k);}catch(e){localStorage.removeItem(k);}}
+  });
+
+  // Load cache dulu agar langsung tampil walau offline
+  const cached=localStorage.getItem('cache_kelas')||localStorage.getItem('adm_cache_kelas');
+  if(cached){
+    try{
+      const c=JSON.parse(cached);
+      if(c.length){
+        kelasList=c;
+        sel.innerHTML=kelasList.map(k=>'<option value="'+k.id+'">'+k.nama+'</option>').join('');
+        selectedKelas=kelasList[0].id;sel.value=selectedKelas;
+        gantiKelas();
+      }
+    }catch(e){}
   }
-  if(!kelasList.length){sel.innerHTML='<option value="">Belum ada kelas — buat di admin</option>';return;}
-  sel.innerHTML=kelasList.map(k=>'<option value="'+k.id+'">'+k.nama+'</option>').join('');
-  selectedKelas=kelasList[0].id;sel.value=selectedKelas;
-  gantiKelas();
+
+  // Coba fetch dari Firestore (dengan timeout 5 detik)
+  try{
+    const fetchPromise=getDocs(collection(db,'kelas'));
+    const timeoutPromise=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000));
+    const snap=await Promise.race([fetchPromise,timeoutPromise]);
+    const fresh=[];snap.forEach(d=>fresh.push({id:d.id,...d.data()}));
+    if(fresh.length>0){
+      kelasList=fresh;
+      kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
+      localStorage.setItem('cache_kelas',JSON.stringify(kelasList));
+      sel.innerHTML=kelasList.map(k=>'<option value="'+k.id+'">'+k.nama+'</option>').join('');
+      selectedKelas=kelasList[0].id;sel.value=selectedKelas;
+      gantiKelas();
+    }
+  }catch(e){
+    // Offline atau timeout - sudah pakai cache di atas
+    if(!kelasList.length){
+      sel.innerHTML='<option value="">Belum ada kelas — buat di admin</option>';
+    }
+  }
 }
 
 window.gantiKelas=function(){
@@ -352,20 +378,27 @@ window.gantiKelas=function(){
 
 async function loadSiswa(){
   if(!selectedKelas)return;
-  try{
-    const snap=await getDocs(query(collection(db,'siswa'),where('kelasId','==',selectedKelas)));
-    siswaList=[];snap.forEach(d=>siswaList.push({id:d.id,...d.data()}));
-    localStorage.setItem('cache_siswa_'+selectedKelas,JSON.stringify(siswaList));
-  }catch(e){
-    // Coba cache index dulu, fallback ke cache admin (semua siswa)
-    const cached=localStorage.getItem('cache_siswa_'+selectedKelas);
-    if(cached){siswaList=JSON.parse(cached);}
-    else{
-      const all=localStorage.getItem('adm_cache_siswa');
-      if(all)siswaList=JSON.parse(all).filter(s=>s.kelasId===selectedKelas);
-    }
+
+  // Load cache dulu
+  const cached=localStorage.getItem('cache_siswa_'+selectedKelas);
+  if(cached){try{siswaList=JSON.parse(cached);}catch(e){}}
+  else{
+    const all=localStorage.getItem('adm_cache_siswa');
+    if(all){try{siswaList=JSON.parse(all).filter(s=>s.kelasId===selectedKelas);}catch(e){}}
   }
   updateCounter();
+
+  // Update dari Firestore dengan timeout
+  try{
+    const fetchP=getDocs(query(collection(db,'siswa'),where('kelasId','==',selectedKelas)));
+    const snap=await Promise.race([fetchP,new Promise((_,r)=>setTimeout(()=>r(new Error('t')),5000))]);
+    const fresh=[];snap.forEach(d=>fresh.push({id:d.id,...d.data()}));
+    if(fresh.length>0){
+      siswaList=fresh;
+      localStorage.setItem('cache_siswa_'+selectedKelas,JSON.stringify(siswaList));
+      updateCounter();
+    }
+  }catch(e){}
 }
 
 function subscribeAbsen(){
