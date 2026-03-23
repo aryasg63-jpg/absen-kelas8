@@ -178,7 +178,10 @@ if('serviceWorker' in navigator){
     </div>
   </div>
 
-  <div class="admin-link"><a href="login.html">🔐 Masuk sebagai Admin</a></div>
+  <div class="admin-link" style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:1rem">
+    <button class="btn" onclick="unduhCache()" style="font-size:12px;padding:6px 14px;color:var(--muted)">⬇ Unduh Cache Absen Hari Ini</button>
+    <a href="login.html" style="font-size:12px">🔐 Masuk sebagai Admin</a>
+  </div>
 </div>
 
 <script>
@@ -269,7 +272,7 @@ function updateOnlineBar(){
   let bar=document.getElementById('offline-bar');
   if(!bar){
     bar=document.createElement('div');bar.id='offline-bar';
-    bar.style.cssText='position:fixed;bottom:0;left:0;right:0;padding:8px 16px;font-size:12px;font-weight:700;text-align:center;z-index:999;transition:background .3s;display:none';
+    bar.style.cssText='position:fixed;bottom:0;left:0;right:0;padding:4px 12px;font-size:11px;font-weight:600;text-align:center;z-index:999;transition:background .3s;display:none';
     document.body.appendChild(bar);
   }
   if(!navigator.onLine){
@@ -330,8 +333,8 @@ async function loadKelas(){
     // Cache ke localStorage
     localStorage.setItem('cache_kelas',JSON.stringify(kelasList));
   }catch(e){
-    // Offline: ambil dari cache
-    const cached=localStorage.getItem('cache_kelas');
+    // Coba cache index dulu, fallback ke cache admin
+    const cached=localStorage.getItem('cache_kelas')||localStorage.getItem('adm_cache_kelas');
     if(cached){kelasList=JSON.parse(cached);}
   }
   if(!kelasList.length){sel.innerHTML='<option value="">Belum ada kelas — buat di admin</option>';return;}
@@ -354,8 +357,13 @@ async function loadSiswa(){
     siswaList=[];snap.forEach(d=>siswaList.push({id:d.id,...d.data()}));
     localStorage.setItem('cache_siswa_'+selectedKelas,JSON.stringify(siswaList));
   }catch(e){
+    // Coba cache index dulu, fallback ke cache admin (semua siswa)
     const cached=localStorage.getItem('cache_siswa_'+selectedKelas);
-    if(cached)siswaList=JSON.parse(cached);
+    if(cached){siswaList=JSON.parse(cached);}
+    else{
+      const all=localStorage.getItem('adm_cache_siswa');
+      if(all)siswaList=JSON.parse(all).filter(s=>s.kelasId===selectedKelas);
+    }
   }
   updateCounter();
 }
@@ -434,8 +442,13 @@ async function doAbsen(nama){
     try{
       await idbSave(rec);
       // Tampilkan di log lokal sementara
-      absenHariIni[nama]={...rec,jamStr,status};
+      absenHariIni[nama]={...rec,jamStr,status,_pending:true};
       renderLog();updateCounter();
+      // Simpan ke localStorage agar admin rekap bisa baca
+      const lsKey='absen_local_'+todayStr();
+      let localAbsen=[];try{localAbsen=JSON.parse(localStorage.getItem(lsKey)||'[]');}catch(e){}
+      if(!localAbsen.find(x=>x.nama===nama))localAbsen.push(rec);
+      localStorage.setItem(lsKey,JSON.stringify(localAbsen));
       showAlert(box,'[OFFLINE] '+nama+' dicatat — '+status+' pukul '+jamStr,'info');
       flashScreen(true);playSound(true);
       document.getElementById('inp-nama').value='';
@@ -554,6 +567,37 @@ async function startScanLoop(){
 }
 
 openIDB().then(()=>{updateOnlineBar();syncPending();});
+
+// Unduh cache absensi hari ini sebagai JSON
+window.unduhCache=async function(){
+  const today=todayStr();
+  // Gabungkan data Firestore (absenHariIni) + pending IndexedDB
+  const fireData=Object.values(absenHariIni).map(d=>({
+    nama:d.nama,kelas:d.kelasId||selectedKelas,
+    tanggal:d.tanggal||today,jam:d.jamStr,status:d.status,
+    sumber:d._pending?'pending_offline':'firestore'
+  }));
+  let pendingData=[];
+  try{
+    const all=await idbGetAll();
+    pendingData=all.filter(d=>d.tanggal===today).map(d=>({
+      nama:d.nama,kelas:d.kelasId,tanggal:d.tanggal,
+      jam:d.jamStr,status:d.status,sumber:'offline_belum_sync'
+    }));
+  }catch(e){}
+  // Merge, hindari duplikat
+  const seen=new Set(fireData.map(d=>d.nama));
+  const merged=[...fireData,...pendingData.filter(d=>!seen.has(d.nama))];
+  if(!merged.length){alert('Belum ada data absen hari ini');return;}
+  const json=JSON.stringify({tanggal:today,total:merged.length,data:merged},null,2);
+  const blob=new Blob([json],{type:'application/json'});
+  const a=document.createElement('a');
+  a.download='absen-'+today+'.json';
+  a.href=URL.createObjectURL(blob);
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
 loadKelas();
 </script>
 </body>

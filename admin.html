@@ -511,6 +511,12 @@ window.loadRekap=async function(){
     const ci=localStorage.getItem('adm_cache_izin');
     if(ci)JSON.parse(ci).forEach(dd=>{if(dd.tgl1<=tgl&&tgl<=dd.tgl2)im[dd.nama]=dd;});
   }
+  // Merge data offline pending dari index.html
+  try{
+    const localKey='absen_local_'+tgl;
+    const localData=localStorage.getItem(localKey);
+    if(localData)JSON.parse(localData).forEach(d=>{if(!am[d.nama])am[d.nama]={...d,_pending:true};});
+  }catch(e){}
   let h=0,i=0,s=0,a=0;
   rekapData=targets.map((sw,idx)=>{
     const iz=im[sw.nama],ab=am[sw.nama];let st='Belum absen',jam='-';
