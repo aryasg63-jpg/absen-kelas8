@@ -76,11 +76,11 @@ tbody tr:hover td{background:var(--gray)}
 .alert{padding:10px 14px;border-radius:var(--r);font-size:13px;font-weight:600;margin-bottom:12px;display:none;border:1px solid transparent}
 .a-ok{background:var(--green-bg);color:var(--green);border-color:var(--green-bdr)}
 .a-err{background:var(--red-bg);color:var(--red);border-color:var(--red-bdr)}
-.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
-.qr-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;align-items:center;gap:7px}
-.qr-card canvas{border-radius:6px;border:1px solid var(--border)}
-.qr-name{font-size:13px;font-weight:700;text-align:center}
-.qr-kelas{font-size:11px;color:var(--muted)}
+.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.qr-card{background:#fff;border:1px solid #ddd;border-radius:var(--r);padding:12px 12px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;aspect-ratio:3/4;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.qr-card canvas{border-radius:4px;border:2px solid #fff;box-shadow:0 0 0 1px #eee;image-rendering:pixelated}
+.qr-name{font-size:12px;font-weight:700;text-align:center;color:#111;line-height:1.3}
+.qr-kelas{font-size:10px;color:#888;text-align:center}
 .qr-btns{display:flex;gap:5px}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;padding:1rem}
 .modal-bg.open{display:flex}
@@ -396,12 +396,19 @@ window.renderQRGrid=function(){
   grid.innerHTML='';
   filtered.forEach(s=>{
     const div=document.createElement('div');div.className='qr-card';
-    const canv=document.createElement('canvas');canv.width=150;canv.height=150;canv.dataset.nama=s.nama;div.appendChild(canv);
+    const canv=document.createElement('canvas');canv.width=200;canv.height=200;canv.dataset.nama=s.nama;div.appendChild(canv);
     const nm=document.createElement('div');nm.className='qr-name';nm.textContent=s.nama;div.appendChild(nm);
     if(s.kelasNama){const kl=document.createElement('div');kl.className='qr-kelas';kl.textContent=s.kelasNama;div.appendChild(kl);}
     const btns=document.createElement('div');btns.className='qr-btns';
     const dl=document.createElement('button');dl.className='btn btn-sm btn-blue';dl.textContent='Unduh';
-    dl.onclick=()=>setTimeout(()=>{const a=document.createElement('a');a.download=`QR-${s.nama}.png`;a.href=canv.toDataURL();a.click();},400);
+    dl.onclick=()=>setTimeout(()=>{
+      const W=400,H=533,pad=32;const out=document.createElement('canvas');out.width=W;out.height=H;
+      const cx=out.getContext('2d');cx.fillStyle='#ffffff';cx.fillRect(0,0,W,H);
+      const qrS=W-pad*2;cx.drawImage(canv,pad,pad,qrS,qrS);
+      cx.fillStyle='#111';cx.font='bold 20px sans-serif';cx.textAlign='center';cx.fillText(s.nama,W/2,pad+qrS+30);
+      if(s.kelasNama){cx.fillStyle='#777';cx.font='15px sans-serif';cx.fillText(s.kelasNama,W/2,pad+qrS+52);}
+      const a=document.createElement('a');a.download=`QR-${s.nama}.png`;a.href=out.toDataURL('image/png');a.click();
+    },400);
     const db2=document.createElement('button');db2.className='btn btn-sm btn-red';db2.textContent='Hapus';
     db2.onclick=()=>hapusSiswa(s.id,s.nama);btns.appendChild(dl);btns.appendChild(db2);div.appendChild(btns);
     grid.appendChild(div);setTimeout(()=>drawQR(canv,`ABSEN|KELAS8|${s.nama}`),80);
@@ -426,8 +433,8 @@ window.printSemuaQR=function(){
 async function hapusSiswa(id,nama){if(!confirm(`Hapus "${nama}"?`))return;await deleteDoc(doc(db,'siswa',id));siswaList=siswaList.filter(s=>s.id!==id);renderQRGrid();}
 function drawQR(canvas,text){
   const tmp=document.createElement('div');tmp.style.cssText='position:absolute;left:-9999px';document.body.appendChild(tmp);
-  try{new QRCode(tmp,{text,width:150,height:150,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
-    setTimeout(()=>{const el=tmp.querySelector('canvas')||tmp.querySelector('img');if(el){const ctx=canvas.getContext('2d');if(el.tagName==='CANVAS'){ctx.drawImage(el,0,0,canvas.width,canvas.height);}else{const img=new Image();img.onload=()=>ctx.drawImage(img,0,0,canvas.width,canvas.height);img.src=el.src;}}try{document.body.removeChild(tmp);}catch(e){}},350);
+  try{new QRCode(tmp,{text,width:300,height:300,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.L});
+    setTimeout(()=>{const el=tmp.querySelector('canvas')||tmp.querySelector('img');if(el){const ctx=canvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);if(el.tagName==='CANVAS'){ctx.drawImage(el,0,0,canvas.width,canvas.height);}else{const img=new Image();img.onload=()=>{ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);};img.src=el.src;}}try{document.body.removeChild(tmp);}catch(e){}},350);
   }catch(e){try{document.body.removeChild(tmp);}catch(x){}}
 }
 
