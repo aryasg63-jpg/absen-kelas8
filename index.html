@@ -340,8 +340,22 @@ async function startScanLoop(){
   }
 
   if(!('BarcodeDetector' in window)){
-    console.warn('BarcodeDetector tidak tersedia, menggunakan SimpleQR canvas fallback');
-    startCanvasScan();
+    console.warn('BarcodeDetector tidak tersedia, memuat jsQR...');
+    // Load jsQR dulu, baru mulai scan
+    if(typeof window.jsQR==='function'){
+      startCanvasScan();return;
+    }
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js';
+    s.onload=()=>{console.log('jsQR siap via cdnjs');startCanvasScan();};
+    s.onerror=()=>{
+      const s2=document.createElement('script');
+      s2.src='https://unpkg.com/jsqr@1.4.0/dist/jsQR.js';
+      s2.onload=()=>{console.log('jsQR siap via unpkg');startCanvasScan();};
+      s2.onerror=()=>{console.warn('jsQR gagal, pakai SimpleQR');startCanvasScan();};
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);
     return;
   }
 
@@ -384,11 +398,18 @@ function startCanvasScan(){
     if(!video.srcObject||video.paused||video.videoWidth===0)return;
     canvas.width=video.videoWidth;canvas.height=video.videoHeight;
     ctx.drawImage(video,0,0);
-    if(!window.SimpleQR)return;
-    const img=ctx.getImageData(0,0,canvas.width,canvas.height);
-    const result=window.SimpleQR.decode(img.data,canvas.width,canvas.height);
-    if(result&&result.data&&shouldProcess(result.data))processQRResult(result.data);
-  },200);
+    // Gunakan jsQR jika sudah loaded, atau SimpleQR sebagai fallback
+    const qrDecoder=window.jsQR;
+    if(typeof qrDecoder==='function'){
+      const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const code=qrDecoder(img.data,img.width,img.height,{inversionAttempts:'attemptBoth'});
+      if(code&&code.data&&shouldProcess(code.data))processQRResult(code.data);
+    } else if(window.SimpleQR){
+      const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const result=window.SimpleQR.decode(img.data,canvas.width,canvas.height);
+      if(result&&result.data&&shouldProcess(result.data))processQRResult(result.data);
+    }
+  },150);
 }
 
 loadKelas();
