@@ -360,21 +360,128 @@ window.doLogout=async()=>{
   window.location.href='login.html';
 };
 
+// ── IndexedDB sync (sama seperti index.html) ──────────────────────
+const IDB_NAME='absen-offline',IDB_VER=1,IDB_STORE='pending';
+let idb=null;
+function openIDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(IDB_NAME,IDB_VER);
+    req.onupgradeneeded=e=>{
+      if(!e.target.result.objectStoreNames.contains(IDB_STORE))
+        e.target.result.createObjectStore(IDB_STORE,{keyPath:'id',autoIncrement:true});
+    };
+    req.onsuccess=e=>{idb=e.target.result;res(idb);};
+    req.onerror=()=>rej(req.error);
+  });
+}
+async function idbGetAll(){
+  await openIDB();
+  return new Promise((res,rej)=>{
+    const tx=idb.transaction(IDB_STORE,'readonly');
+    const req=tx.objectStore(IDB_STORE).getAll();
+    req.onsuccess=()=>res(req.result);
+    req.onerror=()=>rej(req.error);
+  });
+}
+async function idbDelete(id){
+  await openIDB();
+  return new Promise((res,rej)=>{
+    const tx=idb.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).delete(id).onsuccess=()=>res();
+    tx.onerror=()=>rej(tx.error);
+  });
+}
+
+async function syncPendingAdmin(){
+  let items=[];
+  try{items=await idbGetAll();}catch(e){return 0;}
+  if(!items.length)return 0;
+  let synced=0;
+  for(const item of items){
+    try{
+      const {id,...data}=item;
+      const existing=await getDocs(query(collection(db,'absensi'),
+        where('nama','==',data.nama),
+        where('tanggal','==',data.tanggal),
+        where('kelasId','==',data.kelasId)
+      ));
+      if(existing.empty){
+        await addDoc(collection(db,'absensi'),{
+          nama:data.nama,kelasId:data.kelasId,tanggal:data.tanggal,
+          jamStr:data.jamStr,status:data.status,
+          waktu:Timestamp.fromDate(new Date(data.waktuMs))
+        });
+      }
+      await idbDelete(id);synced++;
+    }catch(e){console.warn('Sync gagal:',e);}
+  }
+  return synced;
+}
+
 async function init(){
   document.getElementById('rek-tgl').value=todayStr();
   document.getElementById('edit-tgl').value=todayStr();
   document.getElementById('stat-bulan').value=nowMonth();
+
   // Offline bar
   const bar=document.createElement('div');bar.id='offline-bar-adm';
-  bar.style.cssText='position:fixed;bottom:0;left:0;right:0;padding:8px 16px;font-size:12px;font-weight:700;text-align:center;z-index:999;display:none';
+  bar.style.cssText='position:fixed;bottom:0;left:0;right:0;padding:4px 16px;font-size:11px;font-weight:600;text-align:center;z-index:999;display:none';
   document.body.appendChild(bar);
-  function updateBar(){
-    if(!navigator.onLine){bar.style.display='block';bar.style.background='#a3201e';bar.style.color='#fff';bar.textContent='Offline — menampilkan data cache. Perubahan tidak tersimpan.';}
-    else{bar.style.display='none';}
+
+  async function updateBar(){
+    // Cek pending IDB
+    let pendingCount=0;
+    try{const p=await idbGetAll();pendingCount=p.length;}catch(e){}
+    if(pendingCount>0){
+      bar.style.display='block';bar.style.background='#8a5a00';bar.style.color='#fff';
+      bar.textContent=pendingCount+' data absen offline belum tersinkron';
+    } else {
+      bar.style.display='none';
+    }
   }
-  updateBar();
-  window.addEventListener('online',updateBar);window.addEventListener('offline',updateBar);
+
+  // Auto sync saat online
+  window.addEventListener('online',async()=>{
+    bar.style.display='block';bar.style.background='#1a5fb4';bar.style.color='#fff';
+    bar.textContent='Menyinkronkan data offline...';
+    const synced=await syncPendingAdmin();
+    if(synced>0){
+      bar.style.display='block';bar.style.background='#1d7a4a';bar.style.color='#fff';
+      bar.textContent=synced+' data berhasil disinkronkan';
+      // Refresh data yang sedang aktif
+      await loadRekap();await loadEditData();
+      setTimeout(()=>updateBar(),3000);
+    } else {
+      updateBar();
+    }
+  });
+  window.addEventListener('offline',()=>{
+    bar.style.display='block';bar.style.background='#a3201e';bar.style.color='#fff';
+    bar.textContent='Offline — menampilkan data cache';
+  });
+
+  await openIDB();
   await loadKelas();await loadSiswa();loadRekap();
+
+  // Cek dan sync pending saat pertama load (kalau online)
+  try{
+    const pending=await idbGetAll();
+    if(pending.length>0){
+      bar.style.display='block';bar.style.background='#1a5fb4';bar.style.color='#fff';
+      bar.textContent='Menyinkronkan '+pending.length+' data offline...';
+      const synced=await syncPendingAdmin();
+      if(synced>0){
+        bar.style.display='block';bar.style.background='#1d7a4a';bar.style.color='#fff';
+        bar.textContent=synced+' data berhasil disinkronkan';
+        await loadRekap();await loadEditData();
+        setTimeout(()=>updateBar(),3000);
+      } else {
+        updateBar();
+      }
+    } else {
+      updateBar();
+    }
+  }catch(e){updateBar();}
 }
 
 window.sw=function(t){
@@ -386,15 +493,17 @@ window.sw=function(t){
 };
 
 async function loadKelas(){
+  // Load cache dulu agar langsung tampil
+  const cachedK=localStorage.getItem('adm_cache_kelas')||localStorage.getItem('cache_kelas');
+  if(cachedK){try{const c=JSON.parse(cachedK);if(c.length){kelasList=c;kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));}}catch(e){}}
   try{
     const snap=await getDocs(collection(db,'kelas'));
-    kelasList=[];snap.forEach(d=>kelasList.push({id:d.id,...d.data()}));
-    kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
-    localStorage.setItem('adm_cache_kelas',JSON.stringify(kelasList));
-  }catch(e){
-    const c=localStorage.getItem('adm_cache_kelas');
-    if(c){kelasList=JSON.parse(c);kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));}
-  }
+    const fresh=[];snap.forEach(d=>fresh.push({id:d.id,...d.data()}));
+    if(fresh.length>0){
+      kelasList=fresh;kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
+      localStorage.setItem('adm_cache_kelas',JSON.stringify(kelasList));
+    }
+  }catch(e){}
   const opts=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
   ['rek-kelas','edit-kelas','stat-kelas'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">Semua kelas</option>'+opts;});
   ['sel-kelas-siswa','iz-kelas'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">-- Pilih kelas --</option>'+opts;});
@@ -430,15 +539,17 @@ window.hapusKelas=async function(id,nama){
 };
 
 async function loadSiswa(){
+  // Load cache dulu
+  const cachedS=localStorage.getItem('adm_cache_siswa')||localStorage.getItem('cache_siswa_all');
+  if(cachedS){try{const c=JSON.parse(cachedS);if(c.length){siswaList=c;siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));}}catch(e){}}
   try{
     const snap=await getDocs(collection(db,'siswa'));
-    siswaList=[];snap.forEach(d=>siswaList.push({id:d.id,...d.data()}));
-    siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));
-    localStorage.setItem('adm_cache_siswa',JSON.stringify(siswaList));
-  }catch(e){
-    const c=localStorage.getItem('adm_cache_siswa');
-    if(c){siswaList=JSON.parse(c);siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));}
-  }
+    const fresh=[];snap.forEach(d=>fresh.push({id:d.id,...d.data()}));
+    if(fresh.length>0){
+      siswaList=fresh;siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));
+      localStorage.setItem('adm_cache_siswa',JSON.stringify(siswaList));
+    }
+  }catch(e){}
   renderQRGrid();
 }
 window.tambahSiswa=async function(){
