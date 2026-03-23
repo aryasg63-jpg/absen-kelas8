@@ -180,7 +180,7 @@ if('serviceWorker' in navigator){
 
   <div class="admin-link" style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:1rem">
     <button class="btn" id="btn-save-offline" onclick="simpanDataOffline()" style="font-size:12px;padding:6px 14px">💾 Simpan Data untuk Offline</button>
-    <button class="btn" onclick="unduhCache()" style="font-size:12px;padding:6px 14px;color:var(--muted)">⬇ Unduh Cache Absen Hari Ini</button>
+    <button class="btn" onclick="hapusDataLokal()" style="font-size:12px;padding:6px 14px;color:var(--red);border-color:var(--red-bdr)">🗑 Hapus Data Lokal</button>
     <a href="login.html" style="font-size:12px">🔐 Masuk sebagai Admin</a>
   </div>
 </div>
@@ -601,6 +601,29 @@ async function startScanLoop(){
 }
 
 openIDB().then(()=>{updateOnlineBar();syncPending();});
+
+window.hapusDataLokal=async function(){
+  if(!navigator.onLine){
+    alert('Hapus data lokal sebaiknya dilakukan saat online agar data Firestore tetap aman.');
+    if(!confirm('Tetap hapus?'))return;
+  } else {
+    if(!confirm('Hapus semua data cache lokal?\nData absensi di Firestore tidak akan terhapus.'))return;
+  }
+  // Hapus semua key cache
+  const keys=Object.keys(localStorage).filter(k=>
+    k.startsWith('cache_')||k.startsWith('adm_cache_')||
+    k.startsWith('absen_local_')||k==='admin_session'
+  );
+  keys.forEach(k=>localStorage.removeItem(k));
+  // Hapus IndexedDB pending
+  try{
+    const pending=await idbGetAll();
+    for(const item of pending)await idbDelete(item.id);
+  }catch(e){}
+  const box=document.getElementById('alert-box');
+  showAlert(box,'Data lokal dihapus ('+keys.length+' item)','info');
+  updateOnlineBar();
+};
 
 // Simpan semua data penting ke localStorage untuk mode offline
 window.simpanDataOffline=async function(){
