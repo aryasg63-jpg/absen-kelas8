@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Scan Absen</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -322,15 +323,17 @@ function startScanLoop(){
   const ctx=canvas.getContext('2d',{willReadFrequently:true});
   let lastResult='',lastTime=0;
 
+  console.log('Scan loop started, video size:', video.videoWidth, 'x', video.videoHeight);
   scanInterval=setInterval(()=>{
-    if(!video.srcObject||video.paused||video.videoWidth===0)return;
+    if(!video.srcObject||video.paused||video.videoWidth===0){return;}
     canvas.width=video.videoWidth;
     canvas.height=video.videoHeight;
     ctx.drawImage(video,0,0);
 
-    if(typeof window._jsQR!=='function')return;
+    const qrFn=window.jsQR||window._jsQR;
+    if(typeof qrFn!=='function'){console.warn('jsQR belum dimuat');return;}
     const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
-    const code=window._jsQR(imageData.data,imageData.width,imageData.height,{inversionAttempts:'dontInvert'});
+    const code=qrFn(imageData.data,imageData.width,imageData.height,{inversionAttempts:'attemptBoth'});
 
     if(code&&code.data){
       const now=Date.now();
@@ -341,13 +344,11 @@ function startScanLoop(){
       else if(nama.startsWith('ABSEN|'))nama=nama.split('|').pop();
       doAbsen(nama);
     }
-  },300);
+  },200);
 }
 
 loadKelas();
 </script>
 
-<!-- jsQR loaded as regular script, exposed to window for module access -->
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" onload="window._jsQR=jsQR"></script>
 </body>
 </html>
