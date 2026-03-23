@@ -319,31 +319,41 @@ if(localStorage.getItem('dark')==='1'){document.documentElement.classList.add('d
 function updateClock(){const n=new Date();document.getElementById('jam').textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;}
 setInterval(updateClock,1000);updateClock();
 
-// Jika offline, langsung pakai sesi cache tanpa tunggu Firebase
-if(!navigator.onLine){
+// Coba Firebase auth dulu, fallback ke cache sesi jika gagal konek
+let authResolved=false;
+
+// Timeout 5 detik - jika Firebase tidak merespons, pakai cache
+const authTimeout=setTimeout(()=>{
+  if(authResolved)return;
+  authResolved=true;
   const saved=localStorage.getItem('admin_session');
   if(saved){
-    const s=JSON.parse(saved);
+    try{
+      const s=JSON.parse(saved);
+      document.getElementById('auth-guard').style.display='block';
+      document.getElementById('admin-email').textContent=s.email+' (offline)';
+      init();
+    }catch(e){window.location.href='login.html';}
+  } else {
+    window.location.href='login.html';
+  }
+},5000);
+
+onAuthStateChanged(auth,user=>{
+  if(authResolved)return;
+  authResolved=true;
+  clearTimeout(authTimeout);
+  if(user){
+    const prev=localStorage.getItem('admin_session');
+    const prevPass=prev?JSON.parse(prev).pass:'';
+    localStorage.setItem('admin_session',JSON.stringify({email:user.email,pass:prevPass}));
     document.getElementById('auth-guard').style.display='block';
-    document.getElementById('admin-email').textContent=s.email+' (offline)';
+    document.getElementById('admin-email').textContent=user.email;
     init();
   } else {
     window.location.href='login.html';
   }
-} else {
-  onAuthStateChanged(auth,user=>{
-    if(user){
-      const prev=localStorage.getItem('admin_session');
-      const prevPass=prev?JSON.parse(prev).pass:'';
-      localStorage.setItem('admin_session',JSON.stringify({email:user.email,pass:prevPass}));
-      document.getElementById('auth-guard').style.display='block';
-      document.getElementById('admin-email').textContent=user.email;
-      init();
-    } else {
-      window.location.href='login.html';
-    }
-  });
-}
+});
 window.doLogout=async()=>{
   localStorage.removeItem('admin_session');
   try{await signOut(auth);}catch(e){}

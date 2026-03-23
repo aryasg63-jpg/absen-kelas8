@@ -64,11 +64,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// Cek offline login saat halaman load
+// Auto-login jika sesi cache tersedia dan cocok
 (function(){
-  if(!navigator.onLine){
-    const saved=localStorage.getItem('admin_session');
-    if(saved){window.location.href='admin.html';return;}
+  const saved=localStorage.getItem('admin_session');
+  if(saved){
+    try{
+      const s=JSON.parse(saved);
+      if(s.email)document.getElementById('email').value=s.email;
+    }catch(e){}
   }
 })();
 
@@ -79,32 +82,47 @@ window.login = async function() {
   const btn = document.getElementById('btn-login');
   if(!email||!pass){err.textContent='Email dan password wajib diisi';err.style.display='block';return;}
   btn.textContent='Memuat...';btn.disabled=true;
+  err.style.display='none';
 
-  // Mode offline: cek kredensial cache
-  if(!navigator.onLine){
-    const saved=localStorage.getItem('admin_session');
-    if(saved){
-      const s=JSON.parse(saved);
-      if(s.email===email&&s.pass===pass){
-        window.location.href='admin.html';return;
-      }
-    }
-    err.textContent='Offline — gunakan akun yang pernah login sebelumnya.';
-    err.style.display='block';
-    btn.textContent='Masuk';btn.disabled=false;
-    return;
-  }
-
+  // Coba Firebase login dulu
   try {
     await signInWithEmailAndPassword(auth, email, pass);
-    // Simpan sesi untuk offline
     localStorage.setItem('admin_session',JSON.stringify({email,pass}));
     window.location.href='admin.html';
+    return;
   } catch(e) {
-    let msg = 'Login gagal. Periksa email dan password.';
-    if(e.code==='auth/user-not-found'||e.code==='auth/wrong-password'||e.code==='auth/invalid-credential') msg='Email atau password salah.';
-    if(e.code==='auth/too-many-requests') msg='Terlalu banyak percobaan. Coba lagi nanti.';
-    err.textContent=msg;err.style.display='block';
+    // Kalau error jaringan/unavailable, coba kredensial cache
+    if(e.code==='auth/network-request-failed'||e.code==='unavailable'||
+       e.message.includes('network')||e.message.includes('offline')||
+       e.message.includes('unavailable')){
+      const saved=localStorage.getItem('admin_session');
+      if(saved){
+        try{
+          const s=JSON.parse(saved);
+          if(s.email===email&&s.pass===pass){
+            window.location.href='admin.html';return;
+          }
+        }catch(ex){}
+      }
+      err.textContent='Tidak bisa konek ke server. Pastikan pernah login online sebelumnya.';
+    } else if(e.code==='auth/user-not-found'||e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'){
+      err.textContent='Email atau password salah.';
+    } else if(e.code==='auth/too-many-requests'){
+      err.textContent='Terlalu banyak percobaan. Coba lagi nanti.';
+    } else {
+      // Fallback: cek cache dulu sebelum menyerah
+      const saved=localStorage.getItem('admin_session');
+      if(saved){
+        try{
+          const s=JSON.parse(saved);
+          if(s.email===email&&s.pass===pass){
+            window.location.href='admin.html';return;
+          }
+        }catch(ex){}
+      }
+      err.textContent='Login gagal: '+e.message;
+    }
+    err.style.display='block';
     btn.textContent='Masuk';btn.disabled=false;
   }
 };
