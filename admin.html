@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin — Absensi</title>
+<title>Admin — SMP Sains Lombok Islamic School</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -120,7 +120,7 @@ if('serviceWorker' in navigator){
   <div class="nav">
     <div class="nav-l">
       <div class="nav-icon">🏫</div>
-      <div><div class="nav-title">Admin — Absensi</div><div class="nav-sub" id="admin-email">—</div></div>
+      <div><div class="nav-title">Admin — SMP Sains Lombok Islamic School</div><div class="nav-sub" id="admin-email">—</div></div>
     </div>
     <div class="nav-r">
       <div class="clock" id="jam">00:00:00</div>
@@ -196,7 +196,7 @@ if('serviceWorker' in navigator){
         <input class="inp" style="width:180px" placeholder="Cari nama..." id="rek-cari" oninput="filterRekap()">
       </div>
       <div class="tbl-wrap"><table>
-        <thead><tr><th style="width:36px">No</th><th>Nama</th><th style="width:90px">Kelas</th><th style="width:85px">Jam</th><th style="width:105px">Status</th></tr></thead>
+        <thead><tr><th style="width:36px">No</th><th>Nama</th><th style="width:90px">Kelas</th><th style="width:70px">Sesi</th><th style="width:75px">Jam</th><th style="width:105px">Status</th></tr></thead>
         <tbody id="tbl-rekap"></tbody>
       </table></div>
     </div>
@@ -574,16 +574,17 @@ window.renderQRGrid=function(){
     const div=document.createElement('div');div.className='qr-card';
     const canv=document.createElement('canvas');canv.width=200;canv.height=200;canv.dataset.nama=s.nama;div.appendChild(canv);
     const nm=document.createElement('div');nm.className='qr-name';nm.textContent=s.nama;div.appendChild(nm);
-    if(s.kelasNama){const kl=document.createElement('div');kl.className='qr-kelas';kl.textContent=s.kelasNama;div.appendChild(kl);}
+    if(s.kelasNama){const kl=document.createElement('div');kl.className='qr-kelas qr-name-sub';kl.textContent=s.kelasNama;div.appendChild(kl);}
     const btns=document.createElement('div');btns.className='qr-btns';
     const dl=document.createElement('button');dl.className='btn btn-sm btn-blue';dl.textContent='Unduh';
     dl.onclick=()=>setTimeout(()=>{
-      const W=400,H=533,pad=32;const out=document.createElement('canvas');out.width=W;out.height=H;
-      const cx=out.getContext('2d');cx.fillStyle='#ffffff';cx.fillRect(0,0,W,H);
-      const qrS=W-pad*2;cx.drawImage(canv,pad,pad,qrS,qrS);
-      cx.fillStyle='#111';cx.font='bold 20px sans-serif';cx.textAlign='center';cx.fillText(s.nama,W/2,pad+qrS+30);
-      if(s.kelasNama){cx.fillStyle='#777';cx.font='15px sans-serif';cx.fillText(s.kelasNama,W/2,pad+qrS+52);}
-      const a=document.createElement('a');a.download=`QR-${s.nama}.png`;a.href=out.toDataURL('image/png');a.click();
+      const W=400,H=533,pd=28;const out=document.createElement('canvas');out.width=W;out.height=H;
+      const cx=out.getContext('2d');cx.imageSmoothingEnabled=false;cx.fillStyle='#ffffff';cx.fillRect(0,0,W,H);
+      cx.strokeStyle='#e5e5e5';cx.lineWidth=1;cx.strokeRect(1,1,W-2,H-2);
+      const qrS=W-pd*2;cx.drawImage(canv,pd,pd,qrS,qrS);
+      cx.fillStyle='#111';cx.font='bold 18px sans-serif';cx.textAlign='center';cx.fillText(s.nama,W/2,pd+qrS+26);
+      if(s.kelasNama){cx.fillStyle='#777';cx.font='14px sans-serif';cx.fillText(s.kelasNama,W/2,pd+qrS+46);}
+      const a=document.createElement('a');a.download='QR-'+s.nama+'.png';a.href=out.toDataURL('image/png');a.click();
     },400);
     const db2=document.createElement('button');db2.className='btn btn-sm btn-red';db2.textContent='Hapus';
     db2.onclick=()=>hapusSiswa(s.id,s.nama);btns.appendChild(dl);btns.appendChild(db2);div.appendChild(btns);
@@ -591,8 +592,22 @@ window.renderQRGrid=function(){
   });
 };
 window.unduhSemuaQR=function(){
-  const cs=document.querySelectorAll('#qr-grid canvas');if(!cs.length){alert('Belum ada QR');return;}
-  cs.forEach((c,i)=>setTimeout(()=>{const a=document.createElement('a');a.download=`QR-${c.dataset.nama||i+1}.png`;a.href=c.toDataURL();a.click();},i*300));
+  const cards=document.querySelectorAll('#qr-grid .qr-card');if(!cards.length){alert('Belum ada QR');return;}
+  cards.forEach((card,i)=>{
+    setTimeout(()=>{
+      const canv=card.querySelector('canvas');const nama=canv?.dataset.nama||('siswa-'+(i+1));const kelas=card.querySelector('.qr-name-sub')?.textContent||'';
+      if(!canv)return;
+      // Buat canvas 4:3 putih sama seperti unduh satu
+      const W=400,H=533,pad=28;const out=document.createElement('canvas');out.width=W;out.height=H;
+      const cx=out.getContext('2d');cx.fillStyle='#ffffff';cx.fillRect(0,0,W,H);
+      // Border tipis
+      cx.strokeStyle='#e5e5e5';cx.lineWidth=1;cx.strokeRect(1,1,W-2,H-2);
+      const qrS=W-pad*2;cx.drawImage(canv,pad,pad,qrS,qrS);
+      cx.fillStyle='#111';cx.font='bold 18px sans-serif';cx.textAlign='center';cx.fillText(nama,W/2,pad+qrS+26);
+      if(kelas){cx.fillStyle='#777';cx.font='14px sans-serif';cx.fillText(kelas,W/2,pad+qrS+46);}
+      const a=document.createElement('a');a.download='QR-'+nama+'.png';a.href=out.toDataURL('image/png');a.click();
+    },i*350);
+  });
 };
 window.printSemuaQR=function(){
   const fk=document.getElementById('sel-kelas-qr')?.value||'';
@@ -609,8 +624,8 @@ window.printSemuaQR=function(){
 async function hapusSiswa(id,nama){if(!confirm(`Hapus "${nama}"?`))return;await deleteDoc(doc(db,'siswa',id));siswaList=siswaList.filter(s=>s.id!==id);renderQRGrid();}
 function drawQR(canvas,text){
   const tmp=document.createElement('div');tmp.style.cssText='position:absolute;left:-9999px';document.body.appendChild(tmp);
-  try{new QRCode(tmp,{text,width:300,height:300,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.L});
-    setTimeout(()=>{const el=tmp.querySelector('canvas')||tmp.querySelector('img');if(el){const ctx=canvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);if(el.tagName==='CANVAS'){ctx.drawImage(el,0,0,canvas.width,canvas.height);}else{const img=new Image();img.onload=()=>{ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);};img.src=el.src;}}try{document.body.removeChild(tmp);}catch(e){}},350);
+  try{new QRCode(tmp,{text,width:400,height:400,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+    setTimeout(()=>{const el=tmp.querySelector('canvas')||tmp.querySelector('img');if(el){const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);if(el.tagName==='CANVAS'){ctx.drawImage(el,0,0,canvas.width,canvas.height);}else{const img=new Image();img.onload=()=>{ctx.imageSmoothingEnabled=false;ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);};img.src=el.src;}}try{document.body.removeChild(tmp);}catch(e){}},350);
   }catch(e){try{document.body.removeChild(tmp);}catch(x){}}
 }
 
@@ -640,16 +655,16 @@ window.loadRekap=async function(){
   }catch(e){}
   let h=0,i=0,s=0,a=0;
   rekapData=targets.map((sw,idx)=>{
-    const iz=im[sw.nama],ab=am[sw.nama];let st='Belum absen',jam='-';
-    if(iz){st=iz.jenis;iz.jenis==='Izin'?i++:s++;}else if(ab){jam=ab.jamStr;st=ab.status;st==='Alfa'?a++:h++;}
-    return{no:idx+1,nama:sw.nama,kelas:sw.kelasNama||'-',jam,status:st};
+    const iz=im[sw.nama],ab=am[sw.nama];let st='Belum absen',jam='-',sesi='-',lat=null,lng=null,jarakM=null;
+    if(iz){st=iz.jenis;iz.jenis==='Izin'?i++:s++;}else if(ab){jam=ab.jamStr;st=ab.status;sesi=ab.sesi||'masuk';lat=ab.lat||null;lng=ab.lng||null;jarakM=ab.jarakM||null;st==='Alfa'?a++:h++;}
+    return{no:idx+1,nama:sw.nama,kelas:sw.kelasNama||'-',jam,status:st,sesi,lat,lng,jarakM};
   });
   document.getElementById('cnt-h').textContent=h;document.getElementById('cnt-i').textContent=i;
   document.getElementById('cnt-s').textContent=s;document.getElementById('cnt-a').textContent=a;
   renderRekapTable(rekapData);
 };
 function renderRekapTable(data){
-  document.getElementById('tbl-rekap').innerHTML=data.map(d=>`<tr><td>${d.no}</td><td>${d.nama}</td><td>${d.kelas}</td><td>${d.jam}</td><td><span class="badge ${bc(d.status)}">${d.status}</span></td></tr>`).join('');
+  document.getElementById('tbl-rekap').innerHTML=data.map(d=>`<tr><td>${d.no}</td><td>${d.nama}</td><td>${d.kelas}</td><td style="font-size:11px">${d.sesi||'masuk'}</td><td>${d.jam}</td><td><span class="badge ${bc(d.status)}">${d.status}</span></td></tr>`).join('');
 }
 window.filterRekap=function(){const q=document.getElementById('rek-cari').value.toLowerCase();renderRekapTable(q?rekapData.filter(d=>d.nama.toLowerCase().includes(q)):rekapData);};
 window.markAlfa=async function(){
@@ -772,7 +787,7 @@ window.exportExcelStat=function(){
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Statistik');XLSX.writeFile(wb,'Statistik_Kehadiran.xlsx');
 };
 
-function bc(st){if(st==='Hadir')return'b-hadir';if(st==='Terlambat')return'b-terlambat';if(st==='Alfa')return'b-alfa';if(st==='Izin')return'b-izin';if(st==='Sakit')return'b-sakit';return'b-belum';}
+function bc(st){if(st==='Hadir')return'b-hadir';if(st==='Terlambat')return'b-terlambat';if(st==='Alfa')return'b-alfa';if(st==='Izin')return'b-izin';if(st==='Sakit')return'b-sakit';if(st==='Pulang')return'b-pulang';return'b-belum';}
 function showAlert(el,msg,type){el.textContent=msg;el.className='alert '+(type==='ok'?'a-ok':'a-err');el.style.display='block';setTimeout(()=>el.style.display='none',3500);}
 window.closeModal=function(id){document.getElementById(id).classList.remove('open');};
 </script>

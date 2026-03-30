@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal Wali Murid — SMP Sains Lombok</title>
+<link rel="icon" href="data:,">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f4ff;--surface:#fff;--border:#dde4f5;
+  --text:#1a1c2e;--muted:#6b718f;--hint:#b8bdd8;
+  --green:#1a6e42;--green-bg:#e6f4ed;--green-bdr:#8fd4b0;
+  --red:#b32020;--red-bg:#fce9e9;--red-bdr:#f5a8a8;
+  --amber:#8a5c00;--amber-bg:#fef0d0;--amber-bdr:#f0c870;
+  --blue:#1a4fb4;--blue-bg:#e8effc;--blue-bdr:#a8c0f0;
+  --purple:#5c35a0;--purple-bg:#f0ebfc;--purple-bdr:#c8b0f0;
+  --gray:#edf0f8;--r:12px;--rl:18px;
+  --shadow:0 2px 12px rgba(26,28,46,.08);
+}
+body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.wrap{max-width:520px;margin:0 auto;padding:1rem}
+
+/* HERO */
+.hero{background:linear-gradient(135deg,#1a4fb4 0%,#2563eb 50%,#1a6e9f 100%);border-radius:var(--rl);padding:1.75rem 1.5rem 1.5rem;margin-bottom:1rem;color:#fff;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;right:-30px;top:-30px;width:140px;height:140px;background:rgba(255,255,255,.08);border-radius:50%}
+.hero::after{content:"";position:absolute;right:20px;bottom:-20px;width:80px;height:80px;background:rgba(255,255,255,.06);border-radius:50%}
+.hero-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;opacity:.8;margin-bottom:6px}
+.hero h1{font-size:22px;font-weight:700;margin-bottom:4px}
+.hero p{font-size:13px;opacity:.8}
+
+/* SEARCH */
+.search-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:1.25rem;margin-bottom:1rem;box-shadow:var(--shadow)}
+.search-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+.inp{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:var(--r);font-size:14px;background:var(--surface);color:var(--text);font-family:"DM Sans",sans-serif;outline:none;transition:border-color .15s}
+.inp:focus{border-color:var(--blue)}
+.btn{padding:11px 20px;border:none;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;font-family:"DM Sans",sans-serif;transition:all .15s}
+.btn-primary{background:linear-gradient(135deg,#1a4fb4,#2563eb);color:#fff;width:100%;margin-top:10px}
+.btn-primary:hover{opacity:.9}
+.btn-primary:active{transform:scale(.98)}
+
+/* STATUS CARD */
+.status-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:1.25rem;margin-bottom:.875rem;box-shadow:var(--shadow)}
+.student-name{font-size:18px;font-weight:700;margin-bottom:2px}
+.student-class{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:1rem}
+.sesi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem}
+.sesi-card{border-radius:var(--r);padding:14px 12px;text-align:center}
+.sesi-card.masuk{background:var(--green-bg);border:1px solid var(--green-bdr)}
+.sesi-card.pulang{background:var(--blue-bg);border:1px solid var(--blue-bdr)}
+.sesi-card.missing{background:var(--red-bg);border:1px solid var(--red-bdr)}
+.sesi-card.pending{background:var(--amber-bg);border:1px solid var(--amber-bdr)}
+.sesi-icon{font-size:24px;margin-bottom:4px}
+.sesi-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;opacity:.7}
+.sesi-status{font-size:14px;font-weight:700}
+.sesi-time{font-family:"DM Mono",monospace;font-size:20px;font-weight:500;margin-top:2px}
+.sesi-sub{font-size:11px;opacity:.8;margin-top:2px}
+.c-green{color:var(--green)}.c-blue{color:var(--blue)}.c-red{color:var(--red)}.c-amber{color:var(--amber)}
+
+/* GPS info */
+.gps-row{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--gray);border-radius:8px;margin-bottom:.75rem}
+.gps-row a{font-size:12px;color:var(--blue);font-weight:600;text-decoration:none}
+.gps-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.gps-txt{font-size:12px;font-weight:600;flex:1}
+
+/* HISTORY */
+.hist-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.hist-list{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto}
+.hist-item{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--gray);border-radius:8px}
+.hist-date{font-size:12px;font-weight:600}
+.hist-time{font-size:11px;color:var(--muted);margin-top:1px;font-family:"DM Mono",monospace}
+.badge{display:inline-block;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700}
+.b-hadir{background:var(--green-bg);color:var(--green)}
+.b-terlambat{background:var(--amber-bg);color:var(--amber)}
+.b-alfa,.b-bolos{background:var(--red-bg);color:var(--red)}
+.b-pulang{background:var(--blue-bg);color:var(--blue)}
+.b-izin,.b-sakit{background:var(--purple-bg);color:var(--purple)}
+
+.alert{padding:12px 16px;border-radius:var(--r);font-size:13px;font-weight:600;display:none;margin-bottom:1rem;text-align:center}
+.a-err{background:var(--red-bg);color:var(--red);border:1px solid var(--red-bdr)}
+.a-info{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-bdr)}
+.loading{text-align:center;padding:2rem;color:var(--muted);font-size:13px}
+.back-link{display:block;text-align:center;margin-top:1.25rem;font-size:12px;color:var(--muted);font-weight:600;text-decoration:none}
+.summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:.875rem}
+.sum-box{background:var(--gray);border-radius:8px;padding:8px 4px;text-align:center}
+.sum-num{font-size:18px;font-weight:700;font-family:"DM Mono",monospace}
+.sum-lbl{font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-top:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="hero-badge">SMP Sains Lombok Islamic School</div>
+    <h1>Portal Wali Murid</h1>
+    <p>Pantau kehadiran putra/putri Anda setiap hari</p>
+  </div>
+
+  <div class="search-card">
+    <div class="search-label">Cari nama siswa</div>
+    <input class="inp" id="inp-nama" placeholder="Masukkan nama lengkap anak..." onkeydown="if(event.key==='Enter')cariSiswa()">
+    <button class="btn btn-primary" onclick="cariSiswa()">🔍 Lihat Status Kehadiran</button>
+  </div>
+
+  <div class="alert a-err" id="alert-err"></div>
+  <div class="alert a-info" id="alert-info"></div>
+
+  <div id="result" style="display:none"></div>
+
+  <a href="index.html" class="back-link">← Kembali ke halaman scan</a>
+</div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import{getFirestore,collection,query,where,getDocs,orderBy,limit}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+const FC={apiKey:"AIzaSyDlCnUvgyDT-oTfJJ-nxcPWkhpY_b6JeBw",authDomain:"absen-kelas8.firebaseapp.com",projectId:"absen-kelas8",storageBucket:"absen-kelas8.firebasestorage.app",messagingSenderId:"636560501063",appId:"1:636560501063:web:4384206e2a3cd94151c462"};
+const app=initializeApp(FC),db=getFirestore(app);
+const SEKOLAH_LAT=-8.5735,SEKOLAH_LNG=116.2014,RADIUS_M=500;
+const HARI=["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+const BULAN=["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+function pad(n){return String(n).padStart(2,"0")}
+function todayStr(){const n=new Date();return n.getFullYear()+"-"+pad(n.getMonth()+1)+"-"+pad(n.getDate())}
+function hitungJarak(la1,lo1,la2,lo2){const R=6371000,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180,a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;return Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));}
+
+function showErr(msg){const el=document.getElementById("alert-err");el.textContent=msg;el.style.display="block";setTimeout(()=>el.style.display="none",4000);}
+function showInfo(msg){const el=document.getElementById("alert-info");el.textContent=msg;el.style.display="block";setTimeout(()=>el.style.display="none",3000);}
+
+window.cariSiswa=async function(){
+  const nama=document.getElementById("inp-nama").value.trim();
+  if(!nama){showErr("Masukkan nama siswa terlebih dahulu");return;}
+  const result=document.getElementById("result");
+  result.style.display="block";
+  result.innerHTML='<div class="loading">⏳ Mencari data kehadiran...</div>';
+  try{
+    // Cari siswa
+    const siswaSnap=await getDocs(query(collection(db,"siswa"),where("nama","==",nama)));
+    let siswa=null;
+    if(!siswaSnap.empty)siswaSnap.forEach(d=>{if(!siswa)siswa={id:d.id,...d.data()};});
+    // Coba case-insensitive jika tidak ketemu
+    if(!siswa){
+      const allSnap=await getDocs(collection(db,"siswa"));
+      allSnap.forEach(d=>{if(!siswa){const dd=d.data();if(dd.nama.toLowerCase()===nama.toLowerCase())siswa={id:d.id,...dd};}});
+    }
+    if(!siswa){result.innerHTML='<div class="loading">❌ Siswa tidak ditemukan. Periksa ejaan nama.</div>';return;}
+
+    const today=todayStr();
+    // Ambil absensi hari ini
+    const todaySnap=await getDocs(query(collection(db,"absensi"),where("nama","==",siswa.nama),where("tanggal","==",today)));
+    let masukHariIni=null,pulangHariIni=null;
+    todaySnap.forEach(d=>{const dd=d.data();if(dd.sesi==="pulang")pulangHariIni=dd;else masukHariIni=dd;});
+
+    // Ambil riwayat 30 hari
+    const snap30=await getDocs(query(collection(db,"absensi"),where("nama","==",siswa.nama)));
+    const riwayat=[];snap30.forEach(d=>riwayat.push(d.data()));
+    riwayat.sort((a,b)=>b.tanggal.localeCompare(a.tanggal));
+    const riwayat30=riwayat.slice(0,30);
+
+    // Ambil izin
+    const izinSnap=await getDocs(query(collection(db,"izin"),where("nama","==",siswa.nama)));
+    const izinList=[];izinSnap.forEach(d=>izinList.push(d.data()));
+
+    // Hitung statistik
+    const h=riwayat.filter(r=>r.sesi!=="pulang"&&(r.status==="Hadir"||r.status==="Terlambat")).length;
+    const t=riwayat.filter(r=>r.sesi!=="pulang"&&r.status==="Terlambat").length;
+    const a=riwayat.filter(r=>r.sesi!=="pulang"&&(r.status==="Alfa"||r.status==="Bolos")).length;
+    const iz=izinList.reduce((acc,i)=>{const d1=new Date(i.tgl1),d2=new Date(i.tgl2);return acc+Math.round((d2-d1)/(86400000))+1;},0);
+
+    // GPS info
+    function gpsHtml(data){
+      if(!data||!data.lat)return"";
+      const jk=data.jarakM||hitungJarak(data.lat,data.lng,SEKOLAH_LAT,SEKOLAH_LNG);
+      const ok=jk<=RADIUS_M;
+      const jkStr=jk<1000?jk+"m":(jk/1000).toFixed(1)+"km";
+      return`<div class="gps-row"><span class="gps-dot" style="background:${ok?"#1a6e42":"#b32020"}"></span><span class="gps-txt" style="color:${ok?"var(--green)":"var(--red)"}">📍 ${ok?"Di sekolah":"Di luar sekolah"} (${jkStr})</span><a href="https://maps.google.com/?q=${data.lat},${data.lng}" target="_blank">Lihat peta</a></div>`;
+    }
+
+    // Render masuk card
+    function sesiCard(label,icon,data,sesiType){
+      if(data){
+        const isLate=data.status==="Terlambat";
+        const cls=sesiType==="masuk"?"masuk":"pulang";
+        return`<div class="sesi-card ${cls}">
+          <div class="sesi-icon">${icon}</div>
+          <div class="sesi-label">${label}</div>
+          <div class="sesi-time ${sesiType==="masuk"?"c-green":"c-blue"}">${data.jamStr}</div>
+          <div class="sesi-sub">${isLate?"⚠️ Terlambat":"✓ "+data.status}</div>
+        </div>`;
+      } else {
+        const now=new Date(),tot=now.getHours()*60+now.getMinutes();
+        const bolos=sesiType==="pulang"&&tot>=19*60;
+        return`<div class="sesi-card ${bolos?"missing":"pending"}">
+          <div class="sesi-icon">${icon}</div>
+          <div class="sesi-label">${label}</div>
+          <div class="sesi-status ${bolos?"c-red":"c-amber"}">${bolos?"❌ Bolos":"⏳ Belum"}</div>
+          <div class="sesi-sub">${bolos?"Tidak hadir":"Belum absen"}</div>
+        </div>`;
+      }
+    }
+
+    // Badge status
+    function badgeClass(st){return st==="Hadir"?"b-hadir":st==="Terlambat"?"b-terlambat":st==="Alfa"||st==="Bolos"?"b-alfa":st==="Pulang"?"b-pulang":st==="Izin"?"b-izin":st==="Sakit"?"b-sakit":"b-alfa";}
+
+    // Riwayat grouped by date
+    const byDate={};
+    riwayat30.filter(r=>r.sesi!=="pulang").forEach(r=>{byDate[r.tanggal]={masuk:r};});
+    riwayat30.filter(r=>r.sesi==="pulang").forEach(r=>{if(!byDate[r.tanggal])byDate[r.tanggal]={};byDate[r.tanggal].pulang=r;});
+    izinList.forEach(iz=>{const d1=new Date(iz.tgl1),d2=new Date(iz.tgl2);for(let d=new Date(d1);d<=d2;d.setDate(d.getDate()+1)){const ds=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());if(!byDate[ds])byDate[ds]={};byDate[ds].izin=iz;}});
+    const sortedDates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a)).slice(0,20);
+
+    result.innerHTML=`
+      <div class="status-card">
+        <div class="student-name">${siswa.nama}</div>
+        <div class="student-class">${siswa.kelasNama||"Kelas tidak diketahui"} — Data hari ini, ${HARI[new Date().getDay()]} ${new Date().getDate()} ${BULAN[new Date().getMonth()]}</div>
+        <div class="sesi-grid">
+          ${sesiCard("Absen Masuk","🏫",masukHariIni,"masuk")}
+          ${sesiCard("Absen Pulang","🏠",pulangHariIni,"pulang")}
+        </div>
+        ${gpsHtml(masukHariIni)}
+        ${gpsHtml(pulangHariIni)}
+        <div class="summary-row">
+          <div class="sum-box"><div class="sum-num c-green">${h}</div><div class="sum-lbl">Hadir</div></div>
+          <div class="sum-box"><div class="sum-num c-amber">${t}</div><div class="sum-lbl">Terlambat</div></div>
+          <div class="sum-box"><div class="sum-num c-red">${a}</div><div class="sum-lbl">Alfa/Bolos</div></div>
+          <div class="sum-box"><div class="sum-num" style="color:var(--purple)">${iz}</div><div class="sum-lbl">Izin/Sakit</div></div>
+        </div>
+        <div class="hist-title">Riwayat 20 hari terakhir</div>
+        <div class="hist-list">
+          ${sortedDates.map(tgl=>{
+            const entry=byDate[tgl];
+            const dt=new Date(tgl);const dayName=HARI[dt.getDay()];const dayFmt=dt.getDate()+" "+BULAN[dt.getMonth()];
+            if(entry.izin){return`<div class="hist-item"><div><div class="hist-date">${dayName}, ${dayFmt}</div><div class="hist-time">Izin/Sakit</div></div><span class="badge b-izin">${entry.izin.jenis}</span></div>`;}
+            const masuk=entry.masuk;const pulang=entry.pulang;
+            return`<div class="hist-item">
+              <div>
+                <div class="hist-date">${dayName}, ${dayFmt}</div>
+                <div class="hist-time">Masuk ${masuk?masuk.jamStr:"—"} · Pulang ${pulang?pulang.jamStr:"—"}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+                <span class="badge ${badgeClass(masuk?.status||"Alfa")}">${masuk?.status||"Tidak Hadir"}</span>
+                ${pulang?`<span class="badge b-pulang">Pulang</span>`:""}
+              </div>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>`;
+  }catch(e){result.innerHTML='<div class="loading">❌ Gagal memuat data. Periksa koneksi internet.</div>';}
+};
+
+// Auto-search jika ada query string
+const params=new URLSearchParams(window.location.search);
+const qNama=params.get("nama");
+if(qNama){document.getElementById("inp-nama").value=qNama;window.cariSiswa();}
+</script>
+</body>
+</html>

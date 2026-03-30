@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scan Absen</title>
+<title>Absen — SMP Sains Lombok Islamic School</title>
 <link rel="icon" href="data:,">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
@@ -62,12 +62,13 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .b-hadir{background:var(--green-bg);color:var(--green)}
 .b-terlambat{background:var(--amber-bg);color:var(--amber)}
 .b-alfa{background:var(--red-bg);color:var(--red)}
+.b-pulang{background:var(--blue-bg);color:var(--blue)}
 .cam-btns{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap}
 .counters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.875rem}
 .cnt{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px;text-align:center}
 .cnt-num{font-size:22px;font-weight:700}
 .cnt-lbl{font-size:11px;color:var(--muted);margin-top:2px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
-.c-g{color:var(--green)}.c-r{color:var(--red)}
+.c-g{color:var(--green)}.c-r{color:var(--red)}.c-b{color:var(--blue)}
 .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .admin-link{text-align:center;font-size:12px;color:var(--muted);margin-top:1rem}
 .admin-link a{color:var(--text);font-weight:600;text-decoration:none}
@@ -126,6 +127,7 @@ if('serviceWorker' in navigator){
     <div class="h-left">
       <h1 id="hari-tgl">—</h1>
       <p id="kelas-label">Absensi Harian</p>
+      <p style="font-size:10px;color:var(--hint);margin-top:1px">SMP Sains Lombok Islamic School</p>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <button class="btn" id="dark-toggle" onclick="toggleDark()" style="padding:6px 10px;font-size:15px">🌙</button>
@@ -143,13 +145,19 @@ if('serviceWorker' in navigator){
   </div>
 
   <div class="counters">
-    <div class="cnt"><div class="cnt-num c-g" id="cnt-hadir">0</div><div class="cnt-lbl">Sudah Absen</div></div>
-    <div class="cnt"><div class="cnt-num c-r" id="cnt-belum">0</div><div class="cnt-lbl">Belum Absen</div></div>
+    <div class="cnt"><div class="cnt-num c-g" id="cnt-masuk">0</div><div class="cnt-lbl">Masuk</div></div>
+    <div class="cnt"><div class="cnt-num c-b" id="cnt-pulang">0</div><div class="cnt-lbl">Pulang</div></div>
+    <div class="cnt"><div class="cnt-num c-r" id="cnt-belum">0</div><div class="cnt-lbl">Belum</div></div>
   </div>
 
   <div class="card">
     <h3>Scan QR untuk absen</h3>
     <div id="alert-box" class="alert"></div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button id="tab-masuk" onclick="setMode('masuk')" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer;background:var(--text);color:var(--bg);font-family:inherit">🏫 Absen Masuk</button>
+      <button id="tab-pulang" onclick="setMode('pulang')" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer;background:var(--surface);color:var(--muted);font-family:inherit">🏠 Absen Pulang</button>
+    </div>
+    <div id="loc-status" style="font-size:11px;color:var(--muted);margin-bottom:8px;padding:4px 8px;border:1px solid var(--border);border-radius:99px;display:inline-block">📍 Mengambil lokasi...</div>
     <div class="cam-btns">
       <button class="btn btn-dark" onclick="startCam()">📷 Buka Kamera</button>
       <button class="btn" onclick="stopCam()">Tutup Kamera</button>
@@ -170,7 +178,7 @@ if('serviceWorker' in navigator){
 
   <div class="card">
     <div class="topbar">
-      <h3>Absen masuk hari ini</h3>
+      <h3>Absen Masuk Hari Ini</h3>
       <span id="log-count" style="font-size:12px;color:var(--muted)">0 siswa</span>
     </div>
     <div class="log-list" id="log-list">
@@ -182,11 +190,14 @@ if('serviceWorker' in navigator){
     <button class="btn" id="btn-save-offline" onclick="simpanDataOffline()" style="font-size:12px;padding:6px 14px">💾 Simpan Data untuk Offline</button>
     <button class="btn" onclick="hapusDataLokal()" style="font-size:12px;padding:6px 14px;color:var(--red);border-color:var(--red-bdr)">🗑 Hapus Data Lokal</button>
     <a href="login.html" style="font-size:12px">🔐 Masuk sebagai Admin</a>
+    <a href="wali.html" style="font-size:12px;color:var(--blue)">👨‍👩‍👧 Portal Wali Murid</a>
   </div>
 </div>
 
 <script>
-const BATAS_H=9,BATAS_M=50;
+const BATAS_H=7,BATAS_M=30;
+const BOLOS_H=19,BOLOS_M=0;
+const SEKOLAH_LAT=-8.5541,SEKOLAH_LNG=116.0739,RADIUS_M=500;
 const HARI=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 const BULAN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 function pad(n){return String(n).padStart(2,'0')}
@@ -208,9 +219,9 @@ function updateClock(){
   document.getElementById('hari-tgl').textContent=`${HARI[now.getDay()]}, ${now.getDate()} ${BULAN[now.getMonth()]} ${now.getFullYear()}`;
   const tot=now.getHours()*60+now.getMinutes(),batas=BATAS_H*60+BATAS_M,sisa=batas-tot;
   const bar=document.getElementById('dbar');
-  if(sisa>30){bar.className='dbar db-ok';bar.textContent=`Batas absen: 09:50 — sisa ${sisa} menit`;}
-  else if(sisa>0){bar.className='dbar db-warn';bar.textContent=`Peringatan! Sisa ${sisa} menit sebelum batas 09:50`;}
-  else{bar.className='dbar db-alfa';bar.textContent=`Waktu absen sudah habis. Hubungi guru untuk izin/sakit.`;}
+  if(sisa>30){bar.className='dbar db-ok';bar.textContent=`Batas absen masuk: 07:30 — sisa ${sisa} menit`;}
+  else if(sisa>0){bar.className='dbar db-warn';bar.textContent=`Peringatan! Sisa ${sisa} menit sebelum batas 07:30`;}
+  else{bar.className='dbar db-alfa';bar.textContent=`Waktu absen masuk habis. Masih bisa absen pulang.`;}
 }
 setInterval(updateClock,1000);updateClock();
 </script>
@@ -230,7 +241,32 @@ const firebaseConfig={
 const app=initializeApp(firebaseConfig);
 const db=getFirestore(app);
 
-let kelasList=[],siswaList=[],absenHariIni={},selectedKelas='';
+let kelasList=[],siswaList=[],absenHariIni={},selectedKelas='',absenMode='masuk';
+// ── MODE & LOKASI ─────────────────────────────────────────────────────
+window.setMode=function(m){
+  absenMode=m;
+  const btnM=document.getElementById('tab-masuk'),btnP=document.getElementById('tab-pulang');
+  if(m==='masuk'){btnM.style.background='var(--text)';btnM.style.color='var(--bg)';btnP.style.background='var(--surface)';btnP.style.color='var(--muted)';}
+  else{btnP.style.background='var(--text)';btnP.style.color='var(--bg)';btnM.style.background='var(--surface)';btnM.style.color='var(--muted)';}
+};
+let curLat=null,curLng=null;
+function haversineM(la1,lo1,la2,lo2){const R=6371000,dLa=(la2-la1)*Math.PI/180,dLo=(lo2-lo1)*Math.PI/180,a=Math.sin(dLa/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLo/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
+function startLoc(){
+  if(!navigator.geolocation)return;
+  navigator.geolocation.watchPosition(pos=>{
+    curLat=pos.coords.latitude;curLng=pos.coords.longitude;
+    const dist=Math.round(haversineM(curLat,curLng,SEKOLAH_LAT,SEKOLAH_LNG));
+    const el=document.getElementById('loc-status');
+    if(dist<=RADIUS_M){el.style.color='var(--green)';el.textContent='📍 Di area sekolah ('+dist+'m)';}
+    else{el.style.color='var(--amber)';el.textContent='⚠ Di luar sekolah ('+dist+'m) — dicatat';}
+  },()=>{document.getElementById('loc-status').textContent='📍 Lokasi tidak tersedia';},{enableHighAccuracy:true,maximumAge:30000});
+}
+function getLocNote(){
+  if(curLat===null)return{lat:null,lng:null,jarak_meter:null,lokasi:'tidak_tersedia'};
+  const dist=Math.round(haversineM(curLat,curLng,SEKOLAH_LAT,SEKOLAH_LNG));
+  return{lat:parseFloat(curLat.toFixed(6)),lng:parseFloat(curLng.toFixed(6)),jarak_meter:dist,lokasi:dist<=RADIUS_M?'di_sekolah':'di_luar_sekolah'};
+}
+
 let camStream=null,scanInterval=null,unsubscribe=null;
 
 // ── OFFLINE / IndexedDB ──────────────────────────────────────────────
@@ -373,7 +409,7 @@ async function loadKelas(){
 window.gantiKelas=function(){
   selectedKelas=document.getElementById('sel-kelas').value;
   const k=kelasList.find(x=>x.id===selectedKelas);
-  document.getElementById('kelas-label').textContent=k?k.nama:'Absensi Harian';
+  document.getElementById('kelas-label').textContent=k?(k.nama.replace(/kelas/gi,'Grade')):'Absensi Harian';
   loadSiswa();subscribeAbsen();
 };
 
@@ -412,7 +448,8 @@ function subscribeAbsen(){
   try{
     const q=query(collection(db,'absensi'),where('tanggal','==',todayStr()),where('kelasId','==',selectedKelas));
     unsubscribe=onSnapshot(q,snap=>{
-      absenHariIni={};snap.forEach(d=>absenHariIni[d.data().nama]={...d.data(),id:d.id});
+      absenHariIni={};
+      snap.forEach(d=>{const dd=d.data();if(!absenHariIni[dd.nama])absenHariIni[dd.nama]={};absenHariIni[dd.nama][dd.jenis||'masuk']={...dd,id:d.id};});
       // Merge dengan data offline pending
       idbGetAll().then(pending=>{
         pending.forEach(p=>{if(!absenHariIni[p.nama])absenHariIni[p.nama]={...p,_pending:true};});
@@ -423,13 +460,19 @@ function subscribeAbsen(){
 }
 
 function updateCounter(){
-  document.getElementById('cnt-hadir').textContent=Object.keys(absenHariIni).length;
-  document.getElementById('cnt-belum').textContent=Math.max(0,siswaList.length-Object.keys(absenHariIni).length);
+  const masuk=Object.values(absenHariIni).filter(a=>a.masuk).length;
+  const pulang=Object.values(absenHariIni).filter(a=>a.pulang).length;
+  document.getElementById('cnt-masuk').textContent=masuk;
+  document.getElementById('cnt-pulang').textContent=pulang;
+  document.getElementById('cnt-belum').textContent=Math.max(0,siswaList.length-masuk);
 }
 
 function renderLog(){
   const list=document.getElementById('log-list');
-  const items=Object.values(absenHariIni).sort((a,b)=>(b.waktu?.seconds||0)-(a.waktu?.seconds||0));
+  const items=Object.entries(absenHariIni)
+    .filter(([,a])=>a[absenMode])
+    .map(([nama,a])=>({nama,rec:a[absenMode]}))
+    .sort((a,b)=>(b.rec.waktu?.seconds||b.rec.waktuMs/1000||0)-(a.rec.waktu?.seconds||a.rec.waktuMs/1000||0));
   document.getElementById('log-count').textContent=`${items.length} siswa`;
   if(!items.length){list.innerHTML='<p style="color:var(--hint);font-size:13px;text-align:center;padding:12px">Belum ada yang absen</p>';return;}
   list.innerHTML=items.map(d=>{
@@ -467,16 +510,20 @@ async function doAbsen(nama){
   if(absenHariIni[nama]){showAlert(box,nama+' sudah absen pukul '+absenHariIni[nama].jamStr,'err');flashScreen(false);playSound(false);return;}
   const now=new Date();
   const tot=now.getHours()*60+now.getMinutes();
-  const status=tot<=(BATAS_H*60+BATAS_M)?'Hadir':'Terlambat';
+  let status;
+  if(absenMode==='masuk'){status=tot<=(BATAS_H*60+BATAS_M)?'Hadir':'Terlambat';}
+  else{status='Pulang';}
   const jamStr=pad(now.getHours())+':'+pad(now.getMinutes());
-  const rec={nama,kelasId:selectedKelas,tanggal:todayStr(),jamStr,status,waktuMs:now.getTime()};
+  const locData=getLocNote();
+  const rec={nama,kelasId:selectedKelas,tanggal:todayStr(),jamStr,status,jenis:absenMode,
+    lat:locData.lat,lng:locData.lng,jarak_meter:locData.jarak_meter,lokasi:locData.lokasi,waktuMs:now.getTime()};
 
   if(!navigator.onLine){
     // Simpan ke IndexedDB
     try{
       await idbSave(rec);
-      // Tampilkan di log lokal sementara
-      absenHariIni[nama]={...rec,jamStr,status,_pending:true};
+      if(!absenHariIni[nama])absenHariIni[nama]={};
+      absenHariIni[nama][absenMode]={...rec,_pending:true};
       renderLog();updateCounter();
       // Simpan ke localStorage agar admin rekap bisa baca
       const lsKey='absen_local_'+todayStr();
@@ -496,7 +543,7 @@ async function doAbsen(nama){
 
   // Online: langsung ke Firestore
   try{
-    await addDoc(collection(db,'absensi'),{nama,kelasId:selectedKelas,tanggal:todayStr(),jamStr,status,waktu:Timestamp.fromDate(now)});
+    await addDoc(collection(db,'absensi'),{nama,kelasId:selectedKelas,tanggal:todayStr(),jamStr,status,jenis:absenMode,lat:locData.lat,lng:locData.lng,jarak_meter:locData.jarak_meter,lokasi:locData.lokasi,waktu:Timestamp.fromDate(now)});
     showAlert(box,'✓ '+nama+' — '+status+' pukul '+jamStr,'ok');
     flashScreen(true);playSound(true);
     document.getElementById('inp-nama').value='';
@@ -504,7 +551,8 @@ async function doAbsen(nama){
     // Firestore gagal, fallback ke offline
     try{
       await idbSave(rec);
-      absenHariIni[nama]={...rec};
+      if(!absenHariIni[nama])absenHariIni[nama]={};
+      absenHariIni[nama][absenMode]={...rec};
       renderLog();updateCounter();
       showAlert(box,'[Tersimpan lokal] '+nama+' — '+status,'info');
       flashScreen(true);playSound(true);
@@ -600,7 +648,7 @@ async function startScanLoop(){
   }
 }
 
-openIDB().then(()=>{updateOnlineBar();syncPending();});
+openIDB().then(()=>{updateOnlineBar();syncPending();startLoc();});
 
 window.hapusDataLokal=async function(){
   if(!navigator.onLine){
