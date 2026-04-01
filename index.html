@@ -188,7 +188,10 @@ if('serviceWorker' in navigator){
       </div>
     </div>
     <canvas id="scan-canvas" style="display:none"></canvas>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Atau ketik nama siswa:</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Atau input manual (pilih kelas + nama):</p>
+    <div style="margin-bottom:8px">
+      <select class="inp" id="sel-kelas-manual" style="font-size:12px;padding:7px 10px"><option value="">-- Pilih Kelas (Opsional) --</option></select>
+    </div>
     <div style="display:flex;gap:8px">
       <input class="inp" id="inp-nama" placeholder="Nama siswa..." onkeydown="if(event.key==='Enter')absenManual()">
       <button class="btn btn-dark" onclick="absenManual()">Absen</button>
@@ -385,98 +388,97 @@ async function syncPending(){
 window.addEventListener('online',()=>{updateOnlineBar();setTimeout(syncPending,1000);});
 window.addEventListener('offline',()=>updateOnlineBar());
 
+// ── Semua kelas dimuat tapi tidak ditampilkan ─────────────────────────
 async function loadKelas(){
   const sel=document.getElementById('sel-kelas');
-
-  // Bersihkan cache kosong dari sesi lama
+  // Bersihkan cache kosong
   ['cache_kelas','adm_cache_kelas'].forEach(k=>{
     const v=localStorage.getItem(k);
     if(v){try{if(!JSON.parse(v).length)localStorage.removeItem(k);}catch(e){localStorage.removeItem(k);}}
   });
-
-  // Load cache dulu agar langsung tampil walau offline
+  // Load cache kelas dulu
   const cached=localStorage.getItem('cache_kelas')||localStorage.getItem('adm_cache_kelas');
-  if(cached){
-    try{
-      const c=JSON.parse(cached);
-      if(c.length){
-        kelasList=c;
-        sel.innerHTML=kelasList.map(k=>'<option value="'+k.id+'">'+k.nama+'</option>').join('');
-        selectedKelas=kelasList[0].id;sel.value=selectedKelas;
-        gantiKelas();
-      }
-    }catch(e){}
-  }
-
-  // Coba fetch dari Firestore (dengan timeout 5 detik)
+  if(cached){try{const c=JSON.parse(cached);if(c.length){kelasList=c;}}catch(e){}}
+  // Fetch dari Firestore
   try{
     const fetchPromise=getDocs(collection(db,'kelas'));
-    const timeoutPromise=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000));
-    const snap=await Promise.race([fetchPromise,timeoutPromise]);
+    const snap=await Promise.race([fetchPromise,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000))]);
     const fresh=[];snap.forEach(d=>fresh.push({id:d.id,...d.data()}));
     if(fresh.length>0){
       kelasList=fresh;
       kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
       localStorage.setItem('cache_kelas',JSON.stringify(kelasList));
-      sel.innerHTML=kelasList.map(k=>'<option value="'+k.id+'">'+k.nama+'</option>').join('');
-      selectedKelas=kelasList[0].id;sel.value=selectedKelas;
-      gantiKelas();
     }
-  }catch(e){
-    // Offline atau timeout - sudah pakai cache di atas
-    if(!kelasList.length){
-      sel.innerHTML='<option value="">Belum ada kelas — buat di admin</option>';
-    }
-  }
+  }catch(e){}
+  // Setelah dapat kelas, load semua siswa dan subscribe absen
+  document.getElementById('kelas-label').textContent='Absensi Harian';
+  // Populate manual class selector
+  const manSel=document.getElementById('sel-kelas-manual');
+  if(manSel){manSel.innerHTML='<option value="">-- Pilih Kelas (Opsional) --</option>'+kelasList.map(k=>'<option value="'+k.id+'">'+k.nama+'</option>').join('');}
+  loadSemuaSiswa();
+  subscribeAbsen();
 }
 
 window.gantiKelas=function(){
-  selectedKelas=document.getElementById('sel-kelas').value;
-  const k=kelasList.find(x=>x.id===selectedKelas);
-  document.getElementById('kelas-label').textContent=k?(k.nama.replace(/kelas/gi,'Grade').replace(/kls/gi,'Grade')):'Absensi Harian';
-  loadSiswa();subscribeAbsen();
+  // Tidak dipakai lagi tapi dibiarkan agar tidak error
+  loadSemuaSiswa();subscribeAbsen();
 };
 
-async function loadSiswa(){
-  if(!selectedKelas)return;
-
-  // Load cache dulu
-  const cached=localStorage.getItem('cache_siswa_'+selectedKelas);
-  if(cached){try{siswaList=JSON.parse(cached);}catch(e){}}
-  else{
-    const all=localStorage.getItem('adm_cache_siswa');
-    if(all){try{siswaList=JSON.parse(all).filter(s=>s.kelasId===selectedKelas);}catch(e){}}
+async function loadSemuaSiswa(){
+  // Load SEMUA siswa dari cache (semua kelas)
+  const all=localStorage.getItem('adm_cache_siswa');
+  if(all){try{siswaList=JSON.parse(all);}catch(e){}}
+  // Juga coba gabungkan cache per kelas
+  if(!siswaList.length){
+    let merged=[];
+    for(const k of kelasList){
+      const c=localStorage.getItem('cache_siswa_'+k.id);
+      if(c){try{merged=merged.concat(JSON.parse(c));}catch(e){}}
+    }
+    if(merged.length)siswaList=merged;
   }
   updateCounter();
-
-  // Update dari Firestore dengan timeout
+  // Update dari Firestore - ambil semua siswa
   try{
-    const fetchP=getDocs(query(collection(db,'siswa'),where('kelasId','==',selectedKelas)));
-    const snap=await Promise.race([fetchP,new Promise((_,r)=>setTimeout(()=>r(new Error('t')),5000))]);
+    const fetchP=getDocs(collection(db,'siswa'));
+    const snap=await Promise.race([fetchP,new Promise((_,r)=>setTimeout(()=>r(new Error('t')),7000))]);
     const fresh=[];snap.forEach(d=>fresh.push({id:d.id,...d.data()}));
     if(fresh.length>0){
       siswaList=fresh;
-      localStorage.setItem('cache_siswa_'+selectedKelas,JSON.stringify(siswaList));
+      localStorage.setItem('adm_cache_siswa',JSON.stringify(siswaList));
+      // Simpan per kelas juga
+      kelasList.forEach(k=>{
+        const filtered=fresh.filter(s=>s.kelasId===k.id);
+        localStorage.setItem('cache_siswa_'+k.id,JSON.stringify(filtered));
+      });
       updateCounter();
     }
   }catch(e){}
 }
 
+// Alias agar tidak error jika ada pemanggilan lama
+async function loadSiswa(){return loadSemuaSiswa();}
+
 function subscribeAbsen(){
   if(unsubscribe)unsubscribe();
-  if(!selectedKelas)return;
-  if(!navigator.onLine){
-    // Offline: tampilkan data lokal saja, pending items sudah di absenHariIni
-    renderLog();updateCounter();return;
-  }
+  if(!navigator.onLine){renderLog();updateCounter();return;}
   try{
-    const q=query(collection(db,'absensi'),where('tanggal','==',todayStr()),where('kelasId','==',selectedKelas));
+    // Subscribe ke SEMUA absensi hari ini (tidak filter kelas)
+    const q=query(collection(db,'absensi'),where('tanggal','==',todayStr()));
     unsubscribe=onSnapshot(q,snap=>{
       absenHariIni={};
-      snap.forEach(d=>{const dd=d.data();if(!absenHariIni[dd.nama])absenHariIni[dd.nama]={};absenHariIni[dd.nama][dd.jenis||'masuk']={...dd,id:d.id};});
+      snap.forEach(d=>{
+        const dd=d.data();
+        if(!absenHariIni[dd.nama])absenHariIni[dd.nama]={};
+        absenHariIni[dd.nama][dd.jenis||'masuk']={...dd,id:d.id};
+      });
       // Merge dengan data offline pending
       idbGetAll().then(pending=>{
-        pending.forEach(p=>{if(!absenHariIni[p.nama])absenHariIni[p.nama]={...p,_pending:true};});
+        pending.forEach(p=>{
+          const jenis=p.jenis||'masuk';
+          if(!absenHariIni[p.nama])absenHariIni[p.nama]={};
+          if(!absenHariIni[p.nama][jenis])absenHariIni[p.nama][jenis]={...p,_pending:true};
+        });
         renderLog();updateCounter();
       }).catch(()=>{renderLog();updateCounter();});
     },err=>{console.error('Firestore:',err);renderLog();updateCounter();});
@@ -502,9 +504,11 @@ function renderLog(){
   document.getElementById('log-count').textContent=`${items.length} siswa`;
   if(!items.length){list.innerHTML='<p style="color:var(--hint);font-size:13px;text-align:center;padding:12px">Belum ada yang absen</p>';return;}
   list.innerHTML=items.map(d=>{
-    const badgeCls=d.status==='Hadir'?'b-hadir':d.status==='Terlambat'?'b-terlambat':d.status==='Pulang'?'b-pulang':d.status==='Bolos'?'b-bolos':'b-alfa';
-    const pendingBadge=d._pending?'<span style="font-size:10px;color:var(--amber);margin-left:4px">⏳</span>':'';
-    return '<div class="log-item"><div><div class="log-name">'+d.nama+pendingBadge+'</div><div class="log-time">'+d.jamStr+'</div></div><span class="badge '+badgeCls+'">'+d.status+'</span></div>';
+    const badgeCls=d.rec.status==='Hadir'?'b-hadir':d.rec.status==='Terlambat'?'b-terlambat':d.rec.status==='Pulang'?'b-pulang':d.rec.status==='Bolos'?'b-bolos':d.rec.status==='Izin'?'b-izin':d.rec.status==='Sakit'?'b-terlambat':'b-alfa';
+    const pendingBadge=d.rec._pending?'<span style="font-size:10px;color:var(--amber);margin-left:4px">⏳</span>':'';
+    const klsNm=(d.rec.kelasNama||d.rec.kelasId||'').replace(/kelas/gi,'Grade').replace(/kls/gi,'Grade');
+    const klsTag=klsNm?'<span style="font-size:10px;color:var(--muted);margin-left:4px">['+klsNm+']</span>':'';
+    return '<div class="log-item"><div><div class="log-name">'+d.nama+klsTag+pendingBadge+'</div><div class="log-time">'+d.rec.jamStr+'</div></div><span class="badge '+badgeCls+'">'+d.rec.status+'</span></div>';
   }).join('');
 }
 
@@ -528,12 +532,37 @@ function flashScreen(ok){
   setTimeout(()=>document.body.classList.remove('flash-ok','flash-err'),500);
 }
 
-async function doAbsen(nama){
+async function doAbsen(nama,kelasIdOverride=null,kelasNamaOverride=null){
   const box=document.getElementById('alert-box');
   nama=nama.trim();
   if(!nama){showAlert(box,'Nama tidak boleh kosong','err');flashScreen(false);playSound(false);return;}
-  // Kelas tidak wajib — siswa bisa absen tanpa pilih kelas
-  if(absenHariIni[nama]&&absenHariIni[nama][absenMode]){const pv=absenHariIni[nama][absenMode];showAlert(box,nama+' sudah absen '+absenMode+' pukul '+pv.jamStr,'err');flashScreen(false);playSound(false);return;}
+  // Gunakan kelasId dari QR atau selectedKelas
+  const kelasIdFinal=kelasIdOverride||selectedKelas||'';
+  // Cari info kelas dari daftar kelas
+  const kelasObj=kelasList.find(k=>k.id===kelasIdFinal);
+  const kelasNamaFinal=kelasNamaOverride||(kelasObj?kelasObj.nama:kelasIdFinal)||'';
+  // ── Cegah absen berulang (1x masuk + 1x pulang per hari) ──
+  if(absenHariIni[nama]&&absenHariIni[nama][absenMode]){
+    const pv=absenHariIni[nama][absenMode];
+    showAlert(box,'⛔ '+nama+' sudah absen '+absenMode+' pukul '+(pv.jamStr||'-')+' — absen ditolak','err');
+    flashScreen(false);playSound(false);return;
+  }
+  // Double-check ke Firestore agar tidak duplikat antar device
+  if(navigator.onLine){
+    try{
+      const chk=await getDocs(query(collection(db,'absensi'),
+        where('nama','==',nama),where('tanggal','==',todayStr()),where('jenis','==',absenMode)));
+      if(!chk.empty){
+        const dd=chk.docs[0].data();
+        showAlert(box,'⛔ '+nama+' sudah absen '+absenMode+' pukul '+(dd.jamStr||'-')+' — absen ditolak','err');
+        // Update cache lokal
+        if(!absenHariIni[nama])absenHariIni[nama]={};
+        absenHariIni[nama][absenMode]=dd;
+        renderLog();updateCounter();
+        flashScreen(false);playSound(false);return;
+      }
+    }catch(e){/* Lanjut kalau Firestore tidak bisa diakses */}
+  }
   const now=new Date();
   const tot=now.getHours()*60+now.getMinutes();
   let status;
@@ -541,7 +570,7 @@ async function doAbsen(nama){
   else{const pb=PULANG_BATAS_H*60+PULANG_BATAS_M;status=tot<=pb?'Pulang':'Bolos';}
   const jamStr=pad(now.getHours())+':'+pad(now.getMinutes());
   const locData=getLocNote();
-  const rec={nama,kelasId:selectedKelas,tanggal:todayStr(),jamStr,status,jenis:absenMode,
+  const rec={nama,kelasId:kelasIdFinal,kelasNama:kelasNamaFinal,tanggal:todayStr(),jamStr,status,jenis:absenMode,
     lat:locData.lat,lng:locData.lng,jarak_meter:locData.jarak_meter,lokasi:locData.lokasi,waktuMs:now.getTime()};
 
   if(!navigator.onLine){
@@ -569,7 +598,7 @@ async function doAbsen(nama){
 
   // Online: langsung ke Firestore
   try{
-    await addDoc(collection(db,'absensi'),{nama,kelasId:selectedKelas,tanggal:todayStr(),jamStr,status,jenis:absenMode,lat:locData.lat,lng:locData.lng,jarak_meter:locData.jarak_meter,lokasi:locData.lokasi,waktu:Timestamp.fromDate(now)});
+    await addDoc(collection(db,'absensi'),{nama,kelasId:kelasIdFinal,kelasNama:kelasNamaFinal,tanggal:todayStr(),jamStr,status,jenis:absenMode,lat:locData.lat,lng:locData.lng,jarak_meter:locData.jarak_meter,lokasi:locData.lokasi,waktu:Timestamp.fromDate(now)});
     showAlert(box,'✓ '+nama+' — '+status+' pukul '+jamStr,'ok');
     flashScreen(true);playSound(true);
     document.getElementById('inp-nama').value='';
@@ -598,7 +627,11 @@ function showAlert(el,msg,type){
   setTimeout(()=>el.style.display='none',3500);
 }
 
-window.absenManual=()=>doAbsen(document.getElementById('inp-nama').value);
+window.absenManual=function(){
+  const kelasId=document.getElementById('sel-kelas-manual')?.value||'';
+  const kelasNama=kelasList.find(k=>k.id===kelasId)?.nama||'';
+  doAbsen(document.getElementById('inp-nama').value,kelasId||null,kelasNama||null);
+};
 
 window.startCam=async function(){
   const box=document.getElementById('alert-box');
@@ -631,19 +664,27 @@ window.stopCam=function(){
 };
 
 function processQRResult(raw){
-  let nama=raw.trim(),kls=null;
+  let nama=raw.trim(),kelasId=null,kelasNama=null;
   if(nama.startsWith('ABSEN|')){
     const parts=nama.split('|');
-    if(parts.length>=3){kls=parts[1];nama=parts.slice(2).join('|');}
-    else nama=parts.pop();
+    // Format baru: ABSEN|kelasId|kelasNama|nama
+    if(parts.length>=4){
+      kelasId=parts[1];
+      kelasNama=parts[2];
+      nama=parts.slice(3).join('|');
+    } else if(parts.length>=3){
+      // Format lama: ABSEN|kelasId|nama
+      kelasId=parts[1];
+      nama=parts.slice(2).join('|');
+    } else {
+      nama=parts.pop();
+    }
   } else if(nama.includes('|KELAS8|')){
     nama=nama.split('|KELAS8|')[1];
   }
-  if(kls&&kls!==selectedKelas){
-    const sel=document.getElementById('sel-kelas');
-    if(sel){sel.value=kls;selectedKelas=kls;}
-  }
-  doAbsen(nama);
+  // Set selectedKelas dari QR jika ada
+  if(kelasId){selectedKelas=kelasId;}
+  doAbsen(nama,kelasId,kelasNama);
 }
 
 async function startScanLoop(){
