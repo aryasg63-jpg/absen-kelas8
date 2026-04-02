@@ -100,12 +100,11 @@ body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);min
 <div class="wrap">
 
 <div class="logo-bar">
-  <img src="yayasan-lis.png" alt="Yayasan LIS" class="logo-img">
+  <img src="smp-sains-lis.png" alt="SMP Sains LIS" class="logo-img" style="width:56px;height:56px;">
   <div class="logo-center-text">
     <span class="logo-school-name">SMP Sains Lombok Islamic School</span>
     <span class="logo-school-sub">Portal Wali Murid</span>
   </div>
-  <img src="smp-sains-lis.png" alt="SMP Sains LIS" class="logo-img">
 </div>
 
   <div class="hero">
@@ -141,7 +140,7 @@ import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-ap
 import{getFirestore,collection,query,where,getDocs,orderBy,limit}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const FC={apiKey:"AIzaSyDlCnUvgyDT-oTfJJ-nxcPWkhpY_b6JeBw",authDomain:"absen-kelas8.firebaseapp.com",projectId:"absen-kelas8",storageBucket:"absen-kelas8.firebasestorage.app",messagingSenderId:"636560501063",appId:"1:636560501063:web:4384206e2a3cd94151c462"};
 const app=initializeApp(FC),db=getFirestore(app);
-const SEKOLAH_LAT=-8.5735,SEKOLAH_LNG=116.2014,RADIUS_M=500;
+const SEKOLAH_LAT=-8.572689912427188,SEKOLAH_LNG=116.19501713420503,RADIUS_M=200;
 const HARI=["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
 const BULAN=["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 function pad(n){return String(n).padStart(2,"0")}

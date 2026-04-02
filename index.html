@@ -95,6 +95,64 @@ html.dark .flash-ok{animation:fok-d .5s ease}
 html.dark .flash-err{animation:ferr-d .5s ease}
 @keyframes fok-d{0%,100%{background:var(--bg)}50%{background:rgba(61,214,140,.2)}}
 @keyframes ferr-d{0%,100%{background:var(--bg)}50%{background:rgba(247,95,95,.2)}}
+
+/* ── FLYER REDESIGN STYLES ─────────────────────────── */
+body{background:linear-gradient(160deg,#3a5fe5 0%,#6b3fd4 50%,#9b44e0 100%);min-height:100vh;}
+html.dark body{background:linear-gradient(160deg,#1a2d8a 0%,#3b1a7a 50%,#5a1f90 100%);}
+.layout{max-width:440px;margin:0 auto;padding:1.25rem 1rem;}
+/* Flyer header */
+.flyer-header{text-align:center;padding:1.5rem 0 .75rem;position:relative;}
+.flyer-logo{width:72px;height:72px;object-fit:contain;border-radius:50%;box-shadow:0 4px 16px rgba(0,0,0,.3);background:#fff;padding:4px;}
+.flyer-school-name{font-size:15px;font-weight:800;color:#fff;letter-spacing:1px;margin-top:.5rem;text-shadow:0 1px 4px rgba(0,0,0,.3);}
+.flyer-school-sub{font-size:11px;font-weight:600;color:rgba(255,255,255,.8);letter-spacing:2px;text-transform:uppercase;}
+/* SCAN HERE title */
+.scan-title{text-align:center;padding:.5rem 0;}
+.scan-title-big{font-size:clamp(38px,10vw,52px);font-weight:900;color:transparent;-webkit-text-stroke:3px #fff;text-stroke:3px #fff;letter-spacing:2px;line-height:1;text-shadow:4px 4px 0 rgba(0,0,0,.15);}
+.scan-title-sub{font-size:clamp(20px,6vw,28px);font-weight:900;color:#fff;letter-spacing:3px;text-shadow:2px 2px 0 rgba(0,0,0,.2);}
+/* Cards on gradient */
+.card{background:rgba(255,255,255,.95);border:none;box-shadow:0 8px 32px rgba(0,0,0,.18);backdrop-filter:blur(4px);}
+html.dark .card{background:rgba(26,29,39,.95);}
+.header{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;backdrop-filter:blur(8px);}
+html.dark .header{background:rgba(0,0,0,.25);}
+.header h1,.header p,.header #kelas-label{color:#fff!important;}
+.clock{color:#fff!important;}
+.counters .cnt{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);backdrop-filter:blur(6px);}
+html.dark .counters .cnt{background:rgba(0,0,0,.25);}
+.counters .cnt-lbl{color:rgba(255,255,255,.8)!important;}
+.counters .cnt-num{color:#fff!important;}
+.c-g{color:#5fffb0!important;} .c-r{color:#ff8f8f!important;} .c-b{color:#8fd3ff!important;}
+/* Scan frame corner brackets */
+.scan-frame-box{position:relative;margin:0 0 1rem;padding:12px;}
+.scan-frame-box::before,.scan-frame-box::after,
+.scan-frame-box>.sfb-br,.scan-frame-box>.sfb-bl{content:'';position:absolute;width:28px;height:28px;border-color:#3a5fe5;border-style:solid;}
+.scan-frame-box::before{top:0;left:0;border-width:4px 0 0 4px;border-radius:4px 0 0 0;}
+.scan-frame-box::after{top:0;right:0;border-width:4px 4px 0 0;border-radius:0 4px 0 0;}
+.scan-frame-box>.sfb-br{bottom:0;right:0;border-width:0 4px 4px 0;border-radius:0 0 4px 0;}
+.scan-frame-box>.sfb-bl{bottom:0;left:0;border-width:0 0 4px 4px;border-radius:0 0 0 4px;}
+/* Status bar */
+.dbar{border-radius:var(--rl);margin-bottom:.875rem;font-size:12px;}
+.db-ok{background:rgba(61,214,140,.25);color:#b8ffe0;border:1px solid rgba(61,214,140,.4);}
+.db-warn{background:rgba(255,180,0,.2);color:#ffe08a;border:1px solid rgba(255,180,0,.35);}
+/* THANK YOU footer */
+.flyer-footer{text-align:center;padding:1.5rem 0 .5rem;}
+.flyer-thankyou{font-size:clamp(32px,9vw,48px);font-weight:900;letter-spacing:3px;position:relative;display:inline-block;}
+.flyer-thankyou span{color:#fff;text-shadow:3px 0 0 #0ff,-3px 0 0 #f0f;animation:glitch 3s infinite;}
+.flyer-thankyou span:nth-child(odd){animation-delay:.15s;}
+@keyframes glitch{0%,95%,100%{text-shadow:3px 0 0 #0ff,-3px 0 0 #f0f;}96%{text-shadow:-3px 0 0 #0ff,3px 0 0 #f0f;transform:translateX(2px);}97%{text-shadow:3px 0 0 #0ff,-3px 0 0 #f0f;transform:translateX(-2px);}98%{text-shadow:none;transform:none;}}
+.wm-bar{text-align:center;padding:.5rem 0 .25rem;}
+.wm-text{color:rgba(255,255,255,.5)!important;}
+/* Nav buttons */
+.nav-btn{background:rgba(255,255,255,.15)!important;color:#fff!important;border:1px solid rgba(255,255,255,.3)!important;backdrop-filter:blur(6px);}
+.nav-btn:hover{background:rgba(255,255,255,.25)!important;}
+.nav-btn-admin{background:rgba(255,255,255,.9)!important;color:#3a5fe5!important;}
+.nav-btn-wali{background:rgba(107,63,212,.5)!important;color:#e0d0ff!important;}
+.nav-btn-danger{background:rgba(180,40,40,.3)!important;color:#ffb0b0!important;}
+/* Dark mode toggle */
+#dark-toggle{background:rgba(255,255,255,.15)!important;color:#fff!important;border:1px solid rgba(255,255,255,.3)!important;}
+/* Log list */
+.log-item{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);}
+html.dark .log-item{background:rgba(255,255,255,.06);}
+.log-name{color:#fff!important;} .log-time{color:rgba(255,255,255,.65)!important;}
 </style>
 <script>
 (function webpackUniversalModuleDefinition(root,factory){if(typeof exports==="object"&&typeof module==="object")module.exports=factory();else if(typeof define==="function"&&define.amd)define([],factory);else if(typeof exports==="object")exports["jsQR"]=factory();else root["jsQR"]=factory()})(typeof self!=="undefined"?self:this,function(){return function(modules){var installedModules={};function __webpack_require__(moduleId){if(installedModules[moduleId])return installedModules[moduleId].exports;var module=installedModules[moduleId]={i:moduleId,l:false,exports:{}};modules[moduleId].call(module.exports,module,module.exports,__webpack_require__);module.l=true;return module.exports}__webpack_require__.m=modules;__webpack_require__.c=installedModules;__webpack_require__.d=function(exports,name,getter){if(!__webpack_require__.o(exports,name))Object.defineProperty(exports,name,{configurable:false,enumerable:true,get:getter})};__webpack_require__.n=function(module){var getter=module&&module.__esModule?function(){return module["default"]}:function(){return module};__webpack_require__.d(getter,"a",getter);return getter};__webpack_require__.o=function(object,property){return Object.prototype.hasOwnProperty.call(object,property)};__webpack_require__.p="";return __webpack_require__(__webpack_require__.s=3)}([function(module,exports){
@@ -138,20 +196,25 @@ if('serviceWorker' in navigator){
 <body>
 <div class="layout">
 
-<div class="logo-bar">
-  <!-- Logo Yayasan LIS -->
-<img src="yayasan-lis.png" alt="Yayasan LIS" class="logo-img">  <div class="logo-center-text">
-    <span class="logo-school-name">SMP Sains Lombok Islamic School</span>
-    <span class="logo-school-sub">Sistem Absensi Digital</span>
+<div class="flyer-header">
+  <img src="smp-sains-lis.png" alt="SMP Sains LIS" class="flyer-logo"
+       onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+  <div style="display:none;width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.9);align-items:center;justify-content:center;margin:0 auto;box-shadow:0 4px 16px rgba(0,0,0,.3)">
+    <span style="font-size:22px;font-weight:900;color:#3a5fe5">SMP</span>
   </div>
-  <!-- Logo SMP Sains LIS -->
-<img src="smp-sains-lis.png" alt="SMP Sains LIS" class="logo-img"></div>
+  <div class="flyer-school-name">SMP SAINS</div>
+  <div class="flyer-school-sub">Lombok Islamic School</div>
+</div>
+
+<div class="scan-title">
+  <div class="scan-title-big">SCAN HERE</div>
+  <div class="scan-title-sub">FOR ABSEN</div>
+</div>
 
   <div class="header">
     <div class="h-left">
       <h1 id="hari-tgl">—</h1>
       <p id="kelas-label">Absensi Harian</p>
-      <p style="font-size:10px;color:var(--hint);margin-top:1px">SMP Sains Lombok Islamic School</p>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <button class="btn" id="dark-toggle" onclick="toggleDark()" style="padding:6px 10px;font-size:15px">🌙</button>
@@ -170,31 +233,34 @@ if('serviceWorker' in navigator){
   </div>
 
   <div class="card">
-    <h3>Scan QR untuk absen</h3>
-    <div id="alert-box" class="alert"></div>
-    <div style="display:flex;gap:6px;margin-bottom:10px">
-      <button id="tab-masuk" onclick="setMode('masuk')" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer;background:var(--text);color:var(--bg);font-family:inherit">🏫 Absen Masuk</button>
-      <button id="tab-pulang" onclick="setMode('pulang')" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer;background:var(--surface);color:var(--muted);font-family:inherit">🏠 Absen Pulang</button>
-    </div>
-    <div id="loc-status" style="font-size:11px;color:var(--muted);margin-bottom:8px;padding:4px 8px;border:1px solid var(--border);border-radius:99px;display:inline-block">📍 Mengambil lokasi...</div>
-    <div class="cam-btns">
-      <button class="btn btn-dark" onclick="startCam()">📷 Buka Kamera</button>
-      <button class="btn" onclick="stopCam()">Tutup Kamera</button>
-    </div>
-    <div class="scanner-wrap" id="scanner-wrap">
-      <video id="cam-video" autoplay playsinline muted></video>
-      <div class="scan-overlay">
-        <div class="scan-frame"><div class="scan-line"></div></div>
+    <div class="scan-frame-box">
+      <span class="sfb-br"></span><span class="sfb-bl"></span>
+      <h3 style="margin-bottom:.75rem;text-align:center;font-size:15px;letter-spacing:.5px">📷 Scan QR untuk absen</h3>
+      <div id="alert-box" class="alert"></div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button id="tab-masuk" onclick="setMode('masuk')" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer;background:var(--text);color:var(--bg);font-family:inherit">🏫 Absen Masuk</button>
+        <button id="tab-pulang" onclick="setMode('pulang')" style="flex:1;padding:7px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer;background:var(--surface);color:var(--muted);font-family:inherit">🏠 Absen Pulang</button>
       </div>
-    </div>
-    <canvas id="scan-canvas" style="display:none"></canvas>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Atau input manual (pilih kelas + nama):</p>
-    <div style="margin-bottom:8px">
-      <select class="inp" id="sel-kelas-manual" style="font-size:12px;padding:7px 10px"><option value="">-- Pilih Kelas (Opsional) --</option></select>
-    </div>
-    <div style="display:flex;gap:8px">
-      <input class="inp" id="inp-nama" placeholder="Nama siswa..." onkeydown="if(event.key==='Enter')absenManual()">
-      <button class="btn btn-dark" onclick="absenManual()">Absen</button>
+      <div id="loc-status" style="font-size:11px;color:var(--muted);margin-bottom:8px;padding:4px 8px;border:1px solid var(--border);border-radius:99px;display:inline-block">📍 Mengambil lokasi...</div>
+      <div class="cam-btns">
+        <button class="btn btn-dark" onclick="startCam()">📷 Buka Kamera</button>
+        <button class="btn" onclick="stopCam()">Tutup Kamera</button>
+      </div>
+      <div class="scanner-wrap" id="scanner-wrap">
+        <video id="cam-video" autoplay playsinline muted></video>
+        <div class="scan-overlay">
+          <div class="scan-frame"><div class="scan-line"></div></div>
+        </div>
+      </div>
+      <canvas id="scan-canvas" style="display:none"></canvas>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:8px;margin-top:8px">Atau input manual (pilih kelas + nama):</p>
+      <div style="margin-bottom:8px">
+        <select class="inp" id="sel-kelas-manual" style="font-size:12px;padding:7px 10px"><option value="">-- Pilih Kelas (Opsional) --</option></select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input class="inp" id="inp-nama" placeholder="Nama siswa..." onkeydown="if(event.key==='Enter')absenManual()">
+        <button class="btn btn-dark" onclick="absenManual()">Absen</button>
+      </div>
     </div>
   </div>
 
@@ -205,6 +271,12 @@ if('serviceWorker' in navigator){
     </div>
     <div class="log-list" id="log-list">
       <p style="color:var(--hint);font-size:13px;text-align:center;padding:12px">Belum ada yang absen</p>
+    </div>
+  </div>
+
+  <div class="flyer-footer">
+    <div class="flyer-thankyou">
+      <span>T</span><span>H</span><span>A</span><span>N</span><span>K</span>&nbsp;<span>Y</span><span>O</span><span>U</span>
     </div>
   </div>
 
@@ -224,7 +296,7 @@ if('serviceWorker' in navigator){
 <script>
 const BATAS_H=7,BATAS_M=20;
 const PULANG_BATAS_H=20,PULANG_BATAS_M=0;
-const SEKOLAH_LAT=-8.5541,SEKOLAH_LNG=116.0739,RADIUS_M=500;
+const SEKOLAH_LAT=-8.572689912427188,SEKOLAH_LNG=116.19501713420503,RADIUS_M=200;
 const HARI=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 const BULAN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 function pad(n){return String(n).padStart(2,'0')}

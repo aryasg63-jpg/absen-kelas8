@@ -197,8 +197,21 @@ if('serviceWorker' in navigator){
   <div id="tab-rekap" class="panel">
     <div class="filter-row">
       <div><label>Kelas</label><select class="inp" style="width:auto" id="rek-kelas" onchange="loadRekap()"><option value="">Semua kelas</option></select></div>
-      <div><label>Tanggal</label><input type="date" id="rek-tgl" onchange="loadRekap()"></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-self:flex-end">
+      <div id="rek-mode-harian">
+        <label>Tanggal</label><input type="date" id="rek-tgl" onchange="loadRekap()">
+      </div>
+      <div id="rek-mode-minggu" style="display:none">
+        <label>Minggu (pilih tanggal awal)</label><input type="date" id="rek-tgl-minggu" onchange="loadRekap()">
+      </div>
+      <div id="rek-mode-bulan2" style="display:none">
+        <label>Bulan</label><input type="month" id="rek-tgl-bulan" onchange="loadRekap()">
+      </div>
+      <div style="align-self:flex-end;display:flex;gap:5px;flex-wrap:wrap">
+        <select class="inp" style="width:auto" id="rek-view-mode" onchange="switchRekapMode()">
+          <option value="harian">Harian</option>
+          <option value="mingguan">Mingguan</option>
+          <option value="bulanan">Bulanan</option>
+        </select>
         <button class="btn btn-dark" onclick="markAlfa()">Tandai Alfa</button>
         <button class="btn btn-green" onclick="exportExcel()">Export Excel</button>
         <button class="btn btn-blue" onclick="exportPDF()">Export PDF</button>
@@ -216,7 +229,7 @@ if('serviceWorker' in navigator){
         <input class="inp" style="width:180px" placeholder="Cari nama..." id="rek-cari" oninput="filterRekap()">
       </div>
       <div class="tbl-wrap"><table>
-        <thead><tr><th style="width:36px">No</th><th>Nama</th><th style="width:90px">Kelas</th><th style="width:70px">Sesi</th><th style="width:75px">Jam</th><th style="width:105px">Status</th></tr></thead>
+        <thead><tr><th style="width:36px">No</th><th>Nama</th><th style="width:90px">Kelas</th><th style="width:70px" id="rek-col-sesi">Sesi</th><th style="width:75px" id="rek-col-jam">Jam</th><th style="width:105px">Status</th><th style="width:60px" id="rek-col-libur">Libur</th></tr></thead>
         <tbody id="tbl-rekap"></tbody>
       </table></div>
     </div>
@@ -229,10 +242,15 @@ if('serviceWorker' in navigator){
       <div class="filter-row">
         <div><label>Kelas</label><select class="inp" style="width:auto" id="edit-kelas" onchange="loadEditData()"><option value="">Semua kelas</option></select></div>
         <div><label>Tanggal</label><input type="date" id="edit-tgl" onchange="loadEditData()"></div>
-        <div style="align-self:flex-end"><input class="inp" style="width:180px" placeholder="Cari nama..." id="edit-cari" oninput="filterEditTable()"></div>
+        <div style="align-self:flex-end;display:flex;gap:6px;flex-wrap:wrap">
+          <input class="inp" style="width:160px" placeholder="Cari nama..." id="edit-cari" oninput="filterEditTable()">
+          <button class="btn btn-sm" id="libur-toggle-btn" onclick="toggleLiburEdit()">🏖️ Tandai Libur</button>
+          <button class="btn btn-sm btn-green" onclick="openTambahAbsenLalu()">+ Tambah Absen</button>
+        </div>
       </div>
+      <div id="libur-info-bar" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:10px;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-bdr)">🏖️ Hari ini ditandai sebagai hari libur</div>
       <div class="tbl-wrap"><table>
-        <thead><tr><th>Nama</th><th style="width:90px">Kelas</th><th style="width:85px">Jam</th><th style="width:105px">Status</th><th style="width:100px">Aksi</th></tr></thead>
+        <thead><tr><th>Nama</th><th style="width:90px">Kelas</th><th style="width:85px">Jam</th><th style="width:105px">Status</th><th style="width:110px">Aksi</th></tr></thead>
         <tbody id="tbl-edit"></tbody>
       </table></div>
     </div>
@@ -281,6 +299,30 @@ if('serviceWorker' in navigator){
   </div>
 
 </div></div>
+
+<!-- MODAL TAMBAH ABSEN HARI LALU -->
+<div class="modal-bg" id="modal-tambah-absen">
+  <div class="modal">
+    <h3>Tambah Absen Hari Lalu</h3>
+    <div id="alert-tambah-absen" class="alert"></div>
+    <div class="frow">
+      <div><label>Kelas</label><select class="inp" id="tambah-kelas" onchange="populateTambahSiswa()"><option value="">-- Pilih Kelas --</option></select></div>
+      <div><label>Tanggal</label><input type="date" class="inp" id="tambah-tgl"></div>
+    </div>
+    <div class="frow">
+      <div><label>Nama Siswa</label><select class="inp" id="tambah-nama"><option value="">-- Pilih Siswa --</option></select></div>
+      <div><label>Jam Absen</label><input type="time" class="inp" id="tambah-jam"></div>
+    </div>
+    <div class="frow">
+      <div><label>Status</label><select class="inp" id="tambah-status"><option>Hadir</option><option>Terlambat</option><option>Alfa</option><option>Izin</option><option>Sakit</option><option>Bolos</option></select></div>
+      <div><label>Sesi</label><select class="inp" id="tambah-sesi"><option value="masuk">Masuk</option><option value="pulang">Pulang</option></select></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('modal-tambah-absen')">Batal</button>
+      <button class="btn btn-dark" onclick="simpanTambahAbsen()">Simpan</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL EDIT ABSEN -->
 <div class="modal-bg" id="modal-edit">
@@ -337,7 +379,13 @@ const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 function pad(n){return String(n).padStart(2,'0')}
 function todayStr(){const n=new Date();return`${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`}
 function nowMonth(){const n=new Date();return`${n.getFullYear()}-${pad(n.getMonth()+1)}`}
-let kelasList=[],siswaList=[],rekapData=[],editDataAll=[];
+let kelasList=[],siswaList=[],rekapData=[],editDataAll=[],liburSet=new Set();
+
+// 25002500 Hari Libur 25002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500
+function loadLibur(){try{const saved=localStorage.getItem('hari_libur');if(saved)liburSet=new Set(JSON.parse(saved));}catch(e){}}
+function saveLibur(){localStorage.setItem('hari_libur',JSON.stringify([...liburSet]));}
+window.toggleLibur=function(tgl){if(liburSet.has(tgl)){liburSet.delete(tgl);}else{liburSet.add(tgl);}saveLibur();};
+loadLibur();
 
 window.toggleDark=function(){const d=document.documentElement.classList.toggle('dark');localStorage.setItem('dark',d?'1':'0');document.getElementById('dark-toggle').textContent=d?'☀️':'🌙';};
 if(localStorage.getItem('dark')==='1'){document.documentElement.classList.add('dark');document.getElementById('dark-toggle').textContent='☀️';}
@@ -447,6 +495,9 @@ async function init(){
   document.getElementById('rek-tgl').value=todayStr();
   document.getElementById('edit-tgl').value=todayStr();
   document.getElementById('stat-bulan').value=nowMonth();
+  // Set weekly/monthly defaults
+  const rTglM=document.getElementById('rek-tgl-minggu');if(rTglM)rTglM.value=todayStr();
+  const rTglB=document.getElementById('rek-tgl-bulan');if(rTglB)rTglB.value=nowMonth();
 
   // Offline bar
   const bar=document.createElement('div');bar.id='offline-bar-adm';
@@ -591,143 +642,190 @@ window.tambahSiswa=async function(){
 
 // ── Fungsi helper unduh QR dengan logo ──────────────────────────────
 function downloadQRCard(canv,nama,kelasNama,cb){
-  const W=500,H=680,pd=28;
+  const W=540,H=960;
   const out=document.createElement('canvas');out.width=W;out.height=H;
   const cx=out.getContext('2d');
-  // Background
-  cx.fillStyle='#ffffff';cx.fillRect(0,0,W,H);
-  // Header green bar
-  cx.fillStyle='#1a3a1a';cx.fillRect(0,0,W,90);
-  cx.fillStyle='#ffffff';cx.font='bold 14px sans-serif';cx.textAlign='center';
-  cx.fillText('SMP SAINS LOMBOK ISLAMIC SCHOOL',W/2,56);
-  cx.font='11px sans-serif';
-  cx.fillText('Sistem Absensi Digital',W/2,74);
-  // Border
-  cx.strokeStyle='#1a3a1a';cx.lineWidth=3;cx.strokeRect(1.5,1.5,W-3,H-3);
-  // QR code
-  const qrS=W-pd*2;
-  cx.fillStyle='#ffffff';cx.fillRect(pd-4,94,qrS+8,qrS+8);
-  cx.drawImage(canv,pd,96,qrS,qrS);
-  // Student name
-  cx.fillStyle='#111';cx.font='bold 22px sans-serif';cx.textAlign='center';
-  cx.fillText(nama,W/2,104+qrS+32);
-  // Class chip
-  const klsLbl=(kelasNama||'').replace(/kelas/gi,'Grade').replace(/kls/gi,'Grade');
-  if(klsLbl){
-    const tw=cx.measureText(klsLbl).width+28;
-    cx.fillStyle='#e8f0fc';cx.beginPath();cx.roundRect(W/2-tw/2,104+qrS+44,tw,26,13);cx.fill();
-    cx.fillStyle='#1a5fb4';cx.font='bold 13px sans-serif';cx.fillText(klsLbl,W/2,104+qrS+62);
-  }
-  // Watermark
-  cx.fillStyle='#bbb';cx.font='10px sans-serif';cx.fillText('By-Kali-Linux-Arya. | SMP Sains LIS',W/2,H-12);
 
-  function loadLogos(){
-    let yayLoaded=false,smpLoaded=false;
-    function checkDone(){
-      if(!yayLoaded||!smpLoaded)return;
-      // Draw logos on top of header
-      if(cb)cb(out);
-      else{const a=document.createElement('a');a.download='QR-'+nama+'.png';a.href=out.toDataURL('image/png');a.click();}
+  // Background gradient
+  const grad=cx.createLinearGradient(0,0,W,H);
+  grad.addColorStop(0,'#3652d8');
+  grad.addColorStop(0.45,'#6b3fd4');
+  grad.addColorStop(0.78,'#8f50de');
+  grad.addColorStop(1,'#b8a8e8');
+  cx.fillStyle=grad;cx.fillRect(0,0,W,H);
+
+  // Cyan blob bottom-left
+  const blob=cx.createRadialGradient(0,H,0,0,H,430);
+  blob.addColorStop(0,'rgba(80,200,240,0.38)');
+  blob.addColorStop(1,'rgba(80,200,240,0)');
+  cx.fillStyle=blob;cx.fillRect(0,0,W,H);
+
+  // Diagonal accent stripes
+  cx.save();
+  cx.strokeStyle='rgba(255,255,255,0.10)';cx.lineWidth=44;
+  cx.beginPath();cx.moveTo(-20,110);cx.lineTo(110,0);cx.stroke();
+  cx.beginPath();cx.moveTo(W-110,H);cx.lineTo(W+20,H-110);cx.stroke();
+  cx.restore();
+
+  // Dot grids
+  function dots(ox,oy,rows,cols,gap,r,a){
+    cx.fillStyle='rgba(255,255,255,'+a+')';
+    for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
+      cx.beginPath();cx.arc(ox+col*gap,oy+row*gap,r,0,Math.PI*2);cx.fill();
     }
-    const yayImg=new Image();yayImg.crossOrigin='anonymous';
-    yayImg.onload=function(){
-      cx.drawImage(yayImg,14,8,70,70);
-      yayLoaded=true;checkDone();
-    };
-    yayImg.onerror=function(){yayLoaded=true;checkDone();};
-    yayImg.src='yayasan-lis.png';
-    const smpImg=new Image();smpImg.crossOrigin='anonymous';
-    smpImg.onload=function(){
-      cx.drawImage(smpImg,W-84,8,70,70);
-      smpLoaded=true;checkDone();
-    };
-    smpImg.onerror=function(){smpLoaded=true;checkDone();};
-    smpImg.src='smp-sains-lis.png';
   }
-  loadLogos();
-}
+  dots(W-72,18,3,3,22,4.5,0.55);
+  dots(18,H-72,3,3,22,4.5,0.40);
 
-window.renderQRGrid=function(){
-  const fk=document.getElementById('sel-kelas-qr')?.value||'';
-  const filtered=fk?siswaList.filter(s=>s.kelasId===fk):siswaList;
-  const grid=document.getElementById('qr-grid');
-  const countEl=document.getElementById('qr-count-label');
-  if(countEl)countEl.textContent=filtered.length+' siswa'+(fk?' — '+kelasList.find(k=>k.id===fk)?.nama:'');
-  if(!filtered.length){grid.innerHTML='<p style="color:var(--hint);font-size:13px">Belum ada siswa</p>';return;}
-  grid.innerHTML='';
-  filtered.forEach(s=>{
-    const div=document.createElement('div');div.className='qr-card';
-    // Logo header row
-    const logoRow=document.createElement('div');logoRow.className='qr-card-logos';
-    const lgYay=document.createElement('img');lgYay.src='yayasan-lis.png';lgYay.alt='LIS';lgYay.className='qr-logo';
-    const lg=document.createElement('img');lg.src='smp-sains-lis.png';lg.alt='SMP';lg.className='qr-logo';
-    logoRow.appendChild(lgYay);logoRow.appendChild(lg);div.appendChild(logoRow);
-    const sc=document.createElement('div');sc.className='qr-school';sc.textContent='SMP SAINS LOMBOK ISLAMIC SCHOOL';div.appendChild(sc);
-    const canv=document.createElement('canvas');canv.width=200;canv.height=200;canv.dataset.nama=s.nama;div.appendChild(canv);
-    const nm=document.createElement('div');nm.className='qr-name';nm.textContent=s.nama;div.appendChild(nm);
-    const klsLabel=(s.kelasNama||'').replace(/kelas/gi,'Grade').replace(/kls/gi,'Grade');
-    if(klsLabel){const kl=document.createElement('div');kl.className='qr-kelas qr-name-sub';kl.textContent=klsLabel;div.appendChild(kl);}
-    const wmEl=document.createElement('div');wmEl.className='qr-wm';wmEl.textContent='By-Kali-Linux-Arya.';div.appendChild(wmEl);
-    const btns=document.createElement('div');btns.className='qr-btns';
-    const dl=document.createElement('button');dl.className='btn btn-sm btn-blue';dl.textContent='Unduh';
-    dl.onclick=()=>setTimeout(()=>downloadQRCard(canv,s.nama,s.kelasNama||''),400);
-    const db2=document.createElement('button');db2.className='btn btn-sm btn-red';db2.textContent='Hapus';
-    db2.onclick=()=>hapusSiswa(s.id,s.nama);btns.appendChild(dl);btns.appendChild(db2);div.appendChild(btns);
-    grid.appendChild(div);setTimeout(()=>drawQR(canv,'ABSEN|'+s.kelasId+'|'+(s.kelasNama||s.kelasId||'')+'|'+s.nama),80);
-  });
-};
-window.unduhSemuaQR=function(){
-  const cards=document.querySelectorAll('#qr-grid .qr-card');
-  if(!cards.length){alert('Belum ada QR');return;}
-  cards.forEach((card,i)=>{
-    setTimeout(()=>{
-      const canv=card.querySelector('canvas');
-      const nama=canv?.dataset.nama||('siswa-'+(i+1));
-      const kelas=card.querySelector('.qr-name-sub')?.textContent||'';
-      if(!canv)return;
-      downloadQRCard(canv,nama,kelas);
-    },i*500);
-  });
-};
-window.unduhSemuaQRSaja=function(){
-  const cards=document.querySelectorAll('#qr-grid .qr-card');if(!cards.length){alert('Belum ada QR');return;}
-  cards.forEach((card,i)=>{
-    setTimeout(()=>{
-      const canv=card.querySelector('canvas');
-      const nama=canv?.dataset.nama||('siswa-'+(i+1));
-      if(!canv)return;
-      const out=document.createElement('canvas');out.width=canv.width;out.height=canv.height;
-      const cx=out.getContext('2d');cx.fillStyle='#ffffff';cx.fillRect(0,0,out.width,out.height);
-      cx.drawImage(canv,0,0);
-      const a=document.createElement('a');a.download='QR-saja-'+nama+'.png';a.href=out.toDataURL('image/png');a.click();
-    },i*200);
-  });
-};
-window.printSemuaQR=function(){
-  const fk=document.getElementById('sel-kelas-qr')?.value||'';
-  const filtered=fk?siswaList.filter(s=>s.kelasId===fk):siswaList;
-  const area=document.getElementById('print-area');area.style.display='grid';
-  area.innerHTML=filtered.map(s=>`<div class="print-qr-item" id="pqr-${s.id}"><div class="print-qr-name">${s.nama}</div><div class="print-qr-kelas">${(s.kelasNama||'').replace(/kelas/gi,'Grade').replace(/kls/gi,'Grade')}</div></div>`).join('');
-  filtered.forEach(s=>{
-    const div=document.getElementById('pqr-'+s.id);
-    const c=document.createElement('canvas');c.width=200;c.height=200;
-    div.insertBefore(c,div.firstChild);
-    setTimeout(()=>{
-      drawQR(c,'ABSEN|'+s.kelasId+'|'+(s.kelasNama||s.kelasId||'')+'|'+s.nama);
-      // Setelah QR digambar, konversi ke img untuk print agar terlihat
-      setTimeout(()=>{
-        try{
-          const imgEl=document.createElement('img');
-          imgEl.src=c.toDataURL('image/png');
-          imgEl.style.cssText='width:120px;height:120px;display:block;';
-          div.replaceChild(imgEl,c);
-        }catch(e){}
-      },500);
-    },100);
-  });
-  setTimeout(()=>{window.print();area.style.display='none';},2500);
-};
-async function hapusSiswa(id,nama){if(!confirm(`Hapus "${nama}"?`))return;await deleteDoc(doc(db,'siswa',id));siswaList=siswaList.filter(s=>s.id!==id);renderQRGrid();}
+  // Vertical accent lines
+  cx.save();
+  cx.strokeStyle='rgba(255,255,255,0.25)';cx.lineWidth=3;
+  cx.beginPath();cx.moveTo(18,H*0.38);cx.lineTo(18,H*0.62);cx.stroke();
+  cx.beginPath();cx.moveTo(W-18,H*0.42);cx.lineTo(W-18,H*0.60);cx.stroke();
+  cx.restore();
+
+  // Logo placeholder
+  const logoSize=90,logoY=22,logoCX=W/2;
+
+  // School name (below logo)
+  const sn1Y=logoY+logoSize+20;
+  cx.textAlign='center';
+  cx.fillStyle='#ffffff';
+  cx.font='bold 15px Arial,sans-serif';
+  cx.fillText('SMP SAINS',W/2,sn1Y);
+  cx.font='bold 11px Arial,sans-serif';
+  cx.fillStyle='rgba(255,255,255,0.88)';
+  cx.fillText('LOMBOK ISLAMIC SCHOOL',W/2,sn1Y+20);
+
+  // SCAN HERE - hollow outline
+  const scanY=sn1Y+20+58;
+  cx.save();
+  cx.textAlign='center';
+  cx.font='italic bold 76px "Arial Black",Arial,sans-serif';
+  cx.strokeStyle='#ffffff';cx.lineWidth=12;cx.lineJoin='round';
+  cx.strokeText('SCAN HERE',W/2,scanY);
+  cx.fillStyle='rgba(255,255,255,0)';
+  cx.fillText('SCAN HERE',W/2,scanY);
+  cx.restore();
+
+  // FOR ABSEN
+  const faY=scanY+50;
+  cx.save();
+  cx.textAlign='center';
+  cx.font='bold 30px Arial,sans-serif';
+  cx.fillStyle='#ffffff';
+  cx.fillText('FOR ABSEN',W/2,faY);
+  cx.restore();
+
+  // White card
+  const boxX=22,boxW=W-44;
+  const boxY=faY+20;
+  const qrPad=48,qrSize=boxW-qrPad*2;
+  const qrX=boxX+qrPad,qrY=boxY+qrPad;
+  const niY=qrY+qrSize+34;
+  const ciY=niY+26;
+  const boxH=(ciY+34)-boxY;
+  const boxR=26;
+
+  function rrect(x,y,w,h,r){
+    cx.beginPath();
+    if(cx.roundRect){cx.roundRect(x,y,w,h,r);}
+    else{
+      cx.moveTo(x+r,y);cx.lineTo(x+w-r,y);cx.arcTo(x+w,y,x+w,y+r,r);
+      cx.lineTo(x+w,y+h-r);cx.arcTo(x+w,y+h,x+w-r,y+h,r);
+      cx.lineTo(x+r,y+h);cx.arcTo(x,y+h,x,y+h-r,r);
+      cx.lineTo(x,y+r);cx.arcTo(x,y,x+r,y,r);cx.closePath();
+    }
+  }
+
+  // Card shadow
+  cx.save();
+  cx.shadowColor='rgba(0,0,0,0.50)';cx.shadowBlur=40;cx.shadowOffsetY=12;
+  cx.fillStyle='#ffffff';rrect(boxX,boxY,boxW,boxH,boxR);cx.fill();
+  cx.restore();
+
+  // Card thick border
+  cx.save();
+  cx.strokeStyle='#111222';cx.lineWidth=10;
+  rrect(boxX,boxY,boxW,boxH,boxR);cx.stroke();
+  cx.restore();
+
+  // Corner brackets
+  const bp=32,bl=56,bw=5;
+  const x1=boxX+bp,y1=boxY+bp,x2=boxX+boxW-bp,y2=boxY+boxH-bp;
+  cx.strokeStyle='#2255cc';cx.lineWidth=bw;cx.lineCap='square';
+  cx.beginPath();cx.moveTo(x1,y1+bl);cx.lineTo(x1,y1);cx.lineTo(x1+bl,y1);cx.stroke();
+  cx.beginPath();cx.moveTo(x2-bl,y1);cx.lineTo(x2,y1);cx.lineTo(x2,y1+bl);cx.stroke();
+  cx.beginPath();cx.moveTo(x1,y2-bl);cx.lineTo(x1,y2);cx.lineTo(x1+bl,y2);cx.stroke();
+  cx.beginPath();cx.moveTo(x2-bl,y2);cx.lineTo(x2,y2);cx.lineTo(x2,y2-bl);cx.stroke();
+
+  // QR code
+  cx.fillStyle='#ffffff';cx.fillRect(qrX-2,qrY-2,qrSize+4,qrSize+4);
+  cx.imageSmoothingEnabled=false;
+  cx.drawImage(canv,qrX,qrY,qrSize,qrSize);
+
+  // Student name
+  cx.textAlign='center';
+  cx.fillStyle='#0d0d22';
+  cx.font='bold 22px Arial,sans-serif';
+  cx.fillText(nama,W/2,niY);
+
+  // Class
+  if(kelasNama){
+    cx.fillStyle='#2255cc';
+    cx.font='bold 14px Arial,sans-serif';
+    cx.fillText(kelasNama,W/2,ciY);
+  }
+
+  // THANK YOU glitch
+  const tyY=boxY+boxH+72;
+  const tyStr='THANK YOU';
+  cx.save();
+  cx.font='bold 56px "Arial Black",Arial,sans-serif';
+  cx.textAlign='left';
+  const totalW=cx.measureText(tyStr).width;
+  let tx=W/2-totalW/2;
+  for(let i=0;i<tyStr.length;i++){
+    const ch=tyStr[i];
+    if(ch===' '){tx+=cx.measureText(ch).width;continue;}
+    const cw=cx.measureText(ch).width;
+    cx.fillStyle='rgba(0,224,255,0.55)';cx.fillText(ch,tx+3,tyY+3);
+    cx.fillStyle='rgba(210,40,255,0.55)';cx.fillText(ch,tx-3,tyY-3);
+    cx.fillStyle='#ffffff';cx.fillText(ch,tx,tyY);
+    tx+=cw;
+  }
+  cx.restore();
+
+  // Watermark bar
+  cx.fillStyle='rgba(0,0,0,0.22)';cx.fillRect(0,H-28,W,28);
+  cx.fillStyle='rgba(255,255,255,0.60)';
+  cx.font='10px Arial,sans-serif';cx.textAlign='center';
+  cx.fillText('By-Kali-Linux-Arya   |   SMP Sains Lombok Islamic School',W/2,H-10);
+
+  // Logo (drawn async on top of everything)
+  const logoImg=new Image();logoImg.crossOrigin='anonymous';
+  logoImg.onload=function(){
+    cx.save();
+    cx.beginPath();cx.arc(logoCX,logoY+logoSize/2,logoSize/2+5,0,Math.PI*2);
+    cx.fillStyle='rgba(255,255,255,0.28)';cx.fill();
+    cx.beginPath();cx.arc(logoCX,logoY+logoSize/2,logoSize/2,0,Math.PI*2);cx.clip();
+    cx.fillStyle='#fff';cx.fill();
+    cx.drawImage(logoImg,logoCX-logoSize/2,logoY,logoSize,logoSize);
+    cx.restore();
+    finish();
+  };
+  logoImg.onerror=function(){finish();};
+  logoImg.src='smp-sains-lis.png';
+
+  function finish(){
+    if(cb)cb(out);
+    else{
+      const a=document.createElement('a');
+      a.download='QR-'+nama.replace(/[^a-zA-Z0-9 ._\\'\\-]/g,'_')+'.png';
+      a.href=out.toDataURL('image/png');a.click();
+    }
+  }
+}
 function drawQR(canvas,text){
   const tmp=document.createElement('div');tmp.style.cssText='position:absolute;left:-9999px';document.body.appendChild(tmp);
   try{new QRCode(tmp,{text,width:400,height:400,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
@@ -735,9 +833,35 @@ function drawQR(canvas,text){
   }catch(e){try{document.body.removeChild(tmp);}catch(x){}}
 }
 
+window.switchRekapMode=function(){
+  const mode=document.getElementById('rek-view-mode').value;
+  document.getElementById('rek-mode-harian').style.display=mode==='harian'?'':'none';
+  document.getElementById('rek-mode-minggu').style.display=mode==='mingguan'?'':'none';
+  document.getElementById('rek-mode-bulan2').style.display=mode==='bulanan'?'':'none';
+  // Show/hide columns based on mode
+  const isHarian=mode==='harian';
+  ['rek-col-sesi','rek-col-jam'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=isHarian?'':'none';});
+  loadRekap();
+};
+
 window.loadRekap=async function(){
-  const tgl=document.getElementById('rek-tgl').value||todayStr(),kelasId=document.getElementById('rek-kelas').value;
+  const mode=document.getElementById('rek-view-mode')?.value||'harian';
+  const kelasId=document.getElementById('rek-kelas').value;
+
+  if(mode==='harian'){
+    await loadRekapHarian(kelasId);
+  } else if(mode==='mingguan'){
+    await loadRekapRange(kelasId,'minggu');
+  } else {
+    await loadRekapRange(kelasId,'bulan');
+  }
+};
+
+async function loadRekapHarian(kelasId){
+  const tgl=document.getElementById('rek-tgl').value||todayStr();
+  const isLibur=liburSet.has(tgl);
   let targets=kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList;
+  targets=[...targets].sort((a,b)=>a.nama.localeCompare(b.nama,'id',{sensitivity:'base'}));
   const am={};const im={};
   try{
     const as=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));
@@ -753,26 +877,93 @@ window.loadRekap=async function(){
     const ci=localStorage.getItem('adm_cache_izin');
     if(ci)JSON.parse(ci).forEach(dd=>{if(dd.tgl1<=tgl&&tgl<=dd.tgl2)im[dd.nama]=dd;});
   }
-  // Merge data offline pending dari index.html
-  try{
-    const localKey='absen_local_'+tgl;
-    const localData=localStorage.getItem(localKey);
-    if(localData)JSON.parse(localData).forEach(d=>{if(!am[d.nama])am[d.nama]={...d,_pending:true};});
-  }catch(e){}
+  try{const localKey='absen_local_'+tgl;const localData=localStorage.getItem(localKey);if(localData)JSON.parse(localData).forEach(d=>{if(!am[d.nama])am[d.nama]={...d,_pending:true};});}catch(e){}
   let h=0,i=0,s=0,a=0;
   rekapData=targets.map((sw,idx)=>{
-    const iz=im[sw.nama],ab=am[sw.nama];let st='Belum absen',jam='-',sesi='-',lat=null,lng=null,jarakM=null;
-    if(iz){st=iz.jenis;iz.jenis==='Izin'?i++:s++;}else if(ab){jam=ab.jamStr;st=ab.status;sesi=ab.sesi||'masuk';lat=ab.lat||null;lng=ab.lng||null;jarakM=ab.jarakM||null;st==='Alfa'?a++:h++;}
-    return{no:idx+1,nama:sw.nama,kelas:sw.kelasNama||'-',jam,status:st,sesi,lat:lat||ab?.lat,lng:lng||ab?.lng,jarak_meter:ab?.jarak_meter};
+    const iz=im[sw.nama],ab=am[sw.nama];let st=isLibur?'Libur':'Belum absen',jam='-',sesi='-';
+    if(iz){st=iz.jenis;iz.jenis==='Izin'?i++:s++;}else if(ab){jam=ab.jamStr;st=ab.status;sesi=ab.sesi||'masuk';st==='Alfa'?a++:h++;}else if(isLibur){/* libur */}
+    return{no:idx+1,nama:sw.nama,kelas:sw.kelasNama||'-',jam,status:st,sesi,isLibur};
   });
   document.getElementById('cnt-h').textContent=h;document.getElementById('cnt-i').textContent=i;
   document.getElementById('cnt-s').textContent=s;document.getElementById('cnt-a').textContent=a;
-  renderRekapTable(rekapData);
-};
-function renderRekapTable(data){
-  document.getElementById('tbl-rekap').innerHTML=data.map(d=>`<tr><td>${d.no}</td><td><b>${d.nama}</b></td><td>${d.kelas}</td><td style="font-size:11px">${d.sesi||'masuk'}</td><td style="font-family:monospace;font-size:12px">${d.jam}</td><td><span class="badge ${bc(d.status)}">${d.status}</span></td><td style="font-size:11px">${d.lat?`<a href="https://maps.google.com/?q=${d.lat},${d.lng}" target="_blank">📍 ${d.jarak_meter||''}m</a>`:'—'}</td></tr>`).join('');
+  renderRekapTable(rekapData,'harian');
 }
-window.filterRekap=function(){const q=document.getElementById('rek-cari').value.toLowerCase();renderRekapTable(q?rekapData.filter(d=>d.nama.toLowerCase().includes(q)):rekapData);};
+
+async function loadRekapRange(kelasId,rangeType){
+  let dates=[];
+  if(rangeType==='minggu'){
+    const start=document.getElementById('rek-tgl-minggu').value||todayStr();
+    const d=new Date(start);
+    // Get Monday of that week
+    const day=d.getDay();const diff=(day===0?-6:1-day);
+    d.setDate(d.getDate()+diff);
+    for(let i=0;i<7;i++){const dd=new Date(d);dd.setDate(d.getDate()+i);dates.push(dd.toISOString().slice(0,10));}
+  } else {
+    const month=document.getElementById('rek-tgl-bulan').value||nowMonth();
+    const [yr,mo]=month.split('-').map(Number);
+    const days=new Date(yr,mo,0).getDate();
+    for(let i=1;i<=days;i++)dates.push(`${month}-${String(i).padStart(2,'0')}`);
+  }
+  let targets=kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList;
+  targets=[...targets].sort((a,b)=>a.nama.localeCompare(b.nama,'id',{sensitivity:'base'}));
+  const allAm={};// {nama: {date: data}}
+  try{
+    const snap=await getDocs(collection(db,'absensi'));
+    snap.forEach(d=>{
+      const dd=d.data();
+      if(dates.includes(dd.tanggal)){
+        if(!allAm[dd.nama])allAm[dd.nama]={};
+        if(!allAm[dd.nama][dd.tanggal]||dd.sesi!=='pulang')allAm[dd.nama][dd.tanggal]={...dd,id:d.id};
+      }
+    });
+  }catch(e){}
+  // Fetch izin
+  const izinAll=[];
+  try{const is=await getDocs(collection(db,'izin'));is.forEach(d=>izinAll.push(d.data()));}catch(e){}
+
+  // Build summary per siswa
+  rekapData=targets.map((sw,idx)=>{
+    let h=0,t=0,a=0,iz=0,sk=0,lib=0,total=0;
+    dates.forEach(tgl=>{
+      if(liburSet.has(tgl)){lib++;return;}
+      total++;
+      const izinEntry=izinAll.find(i=>i.nama===sw.nama&&i.tgl1<=tgl&&tgl<=i.tgl2);
+      if(izinEntry){izinEntry.jenis==='Izin'?iz++:sk++;return;}
+      const ab=allAm[sw.nama]?.[tgl];
+      if(!ab){a++;return;}
+      if(ab.status==='Hadir')h++;
+      else if(ab.status==='Terlambat'){h++;t++;}
+      else if(ab.status==='Alfa')a++;
+      else if(ab.status==='Izin')iz++;
+      else if(ab.status==='Sakit')sk++;
+    });
+    const pct=total>0?Math.round((h/total)*100):0;
+    return{no:idx+1,nama:sw.nama,kelas:sw.kelasNama||'-',jam:'-',status:'',sesi:'',h,t,a,iz,sk,lib,total,pct};
+  });
+  document.getElementById('cnt-h').textContent=rekapData.reduce((x,d)=>x+d.h,0);
+  document.getElementById('cnt-i').textContent=rekapData.reduce((x,d)=>x+d.iz,0);
+  document.getElementById('cnt-s').textContent=rekapData.reduce((x,d)=>x+d.sk,0);
+  document.getElementById('cnt-a').textContent=rekapData.reduce((x,d)=>x+d.a,0);
+  renderRekapTable(rekapData,rangeType);
+}
+function renderRekapTable(data, mode){
+  const curMode = mode || (document.getElementById('rek-view-mode')?.value||'harian');
+  const isHarian = curMode==='harian';
+  document.getElementById('tbl-rekap').innerHTML=data.map(d=>{
+    const liburBadge=d.isLibur?'<span style="font-size:10px;margin-left:4px;color:var(--amber)">🏖️</span>':'';
+    if(isHarian){
+      return`<tr${d.isLibur?' style="background:var(--amber-bg)"':''}><td>${d.no}</td><td><b>${d.nama}</b>${liburBadge}</td><td>${d.kelas}</td><td style="font-size:11px">${d.sesi||'masuk'}</td><td style="font-family:monospace;font-size:12px">${d.jam}</td><td><span class="badge ${bc(d.status)}">${d.status}</span></td><td style="font-size:11px">—</td></tr>`;
+    } else {
+      const pctColor=d.pct>=80?'var(--green)':d.pct>=60?'var(--amber)':'var(--red)';
+      return`<tr><td>${d.no}</td><td><b>${d.nama}</b></td><td>${d.kelas}</td><td colspan="2" style="font-size:12px"><span style="color:var(--green)">${d.h}H</span> <span style="color:var(--amber)">${d.t}T</span> <span style="color:var(--red)">${d.a}A</span> <span style="color:var(--blue)">${d.iz}I</span> <span style="color:var(--amber)">${d.sk}S</span>${d.lib?' <span style="color:var(--hint)">'+d.lib+'🏖️</span>':''}</td><td><span style="font-weight:700;color:${pctColor}">${d.pct}%</span></td><td>—</td></tr>`;
+    }
+  }).join('');
+}
+window.filterRekap=function(){
+  const q=document.getElementById('rek-cari').value.toLowerCase();
+  const filtered=q?rekapData.filter(d=>d.nama.toLowerCase().includes(q)):rekapData;
+  renderRekapTable(filtered.map((d,i)=>({...d,no:i+1})));
+};
 window.markAlfa=async function(){
   const tgl=document.getElementById('rek-tgl').value||todayStr();
   const as=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));const am={};as.forEach(d=>am[d.data().nama]=true);
@@ -800,29 +991,122 @@ window.loadEditData=async function(){
   editDataAll=[];
   try{
     const snap=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));
-    snap.forEach(d=>editDataAll.push({id:d.id,...d.data()}));
+    snap.forEach(d=>{
+      const dd=d.data();
+      // Enrich kelasNama from siswaList if missing
+      if(!dd.kelasNama||dd.kelasNama==='-'){
+        const sw=siswaList.find(s=>s.nama===dd.nama);
+        if(sw)dd.kelasNama=sw.kelasNama;
+      }
+      editDataAll.push({id:d.id,...dd});
+    });
     localStorage.setItem('adm_cache_absen_'+tgl,JSON.stringify(editDataAll));
   }catch(e){
     const c=localStorage.getItem('adm_cache_absen_'+tgl);
     if(c)editDataAll=JSON.parse(c);
   }
-  if(kelasId)editDataAll=editDataAll.filter(d=>d.kelasId===kelasId);
-  editDataAll.sort((a,b)=>a.nama.localeCompare(b.nama));renderEditTable(editDataAll);
+  if(kelasId)editDataAll=editDataAll.filter(d=>d.kelasId===kelasId||siswaList.find(s=>s.nama===d.nama&&s.kelasId===kelasId));
+  editDataAll.sort((a,b)=>a.nama.localeCompare(b.nama));
+  // Update libur button
+  const isLibur=liburSet.has(tgl);
+  const liburBtn=document.getElementById('libur-toggle-btn');
+  const liburBar=document.getElementById('libur-info-bar');
+  if(liburBtn){liburBtn.textContent=isLibur?'✅ Libur Aktif':'🏖️ Tandai Libur';liburBtn.className='btn btn-sm '+(isLibur?'btn-red':'');}
+  if(liburBar)liburBar.style.display=isLibur?'block':'none';
+  renderEditTable(editDataAll);
 };
+window.toggleLiburEdit=function(){
+  const tgl=document.getElementById('edit-tgl').value||todayStr();
+  toggleLibur(tgl);
+  loadEditData();
+};
+window.openTambahAbsenLalu=function(){
+  const opts=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
+  document.getElementById('tambah-kelas').innerHTML='<option value="">-- Pilih Kelas --</option>'+opts;
+  const tgl=document.getElementById('edit-tgl').value||todayStr();
+  document.getElementById('tambah-tgl').value=tgl;
+  document.getElementById('tambah-tgl').max=todayStr();
+  document.getElementById('tambah-nama').innerHTML='<option value="">-- Pilih Siswa --</option>';
+  document.getElementById('modal-tambah-absen').classList.add('open');
+};
+window.populateTambahSiswa=function(){
+  const kelasId=document.getElementById('tambah-kelas').value;
+  const filtered=(kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList).sort((a,b)=>a.nama.localeCompare(b.nama,'id'));
+  const sel=document.getElementById('tambah-nama');
+  sel.innerHTML='<option value="">-- Pilih Siswa --</option>';
+  filtered.forEach(s=>{const o=document.createElement('option');o.textContent=s.nama;o.value=s.nama;sel.appendChild(o);});
+};
+window.simpanTambahAbsen=async function(){
+  const nama=document.getElementById('tambah-nama').value;
+  const tgl=document.getElementById('tambah-tgl').value;
+  const jam=document.getElementById('tambah-jam').value;
+  const status=document.getElementById('tambah-status').value;
+  const sesi=document.getElementById('tambah-sesi').value;
+  const kelasId=document.getElementById('tambah-kelas').value;
+  const box=document.getElementById('alert-tambah-absen');
+  if(!nama||!tgl||!kelasId){showAlert(box,'Pilih kelas, siswa, dan tanggal','err');return;}
+  const sw=siswaList.find(s=>s.nama===nama);
+  const kelasNama=sw?.kelasNama||kelasList.find(k=>k.id===kelasId)?.nama||'';
+  await addDoc(collection(db,'absensi'),{
+    nama,kelasId:sw?.kelasId||kelasId,kelasNama,tanggal:tgl,
+    jamStr:jam||'-',status,sesi,
+    waktu:Timestamp.fromDate(new Date(tgl+'T'+(jam||'00:00')+':00'))
+  });
+  showAlert(box,`Absen ${nama} pada ${tgl} disimpan`,'ok');
+  setTimeout(()=>{closeModal('modal-tambah-absen');loadEditData();},1200);
+};
+function getKelasNamaFromData(d){
+  if(d.kelasNama && d.kelasNama!=='-' && d.kelasNama!=='undefined') return d.kelasNama;
+  if(d.kelasId){
+    const byKelasId=siswaList.find(s=>s.kelasId===d.kelasId&&s.nama===d.nama);
+    if(byKelasId?.kelasNama) return byKelasId.kelasNama;
+    const kelasEntry=kelasList.find(k=>k.id===d.kelasId);
+    if(kelasEntry) return kelasEntry.nama;
+  }
+  const byNama=siswaList.find(s=>s.nama===d.nama);
+  if(byNama?.kelasNama) return byNama.kelasNama;
+  return '-';
+}
+// Store edit rows keyed by docId for safe modal open (handles names with quotes/dots)
+let _editRowMap={};
 function renderEditTable(data){
   const tb=document.getElementById('tbl-edit');
   if(!data.length){tb.innerHTML='<tr><td colspan="5" style="color:var(--hint);text-align:center;padding:16px">Tidak ada data</td></tr>';return;}
-  tb.innerHTML=data.map(d=>`<tr><td>${d.nama}</td><td>${d.kelasNama||siswaList.find(s=>s.kelasId===d.kelasId)?.kelasNama||'-'}</td><td>${d.jamStr||'-'}</td><td><span class="badge ${bc(d.status)}">${d.status}</span></td><td style="display:flex;gap:5px"><button class="btn btn-sm btn-blue" onclick="openEditModal('${d.id}','${d.nama}','${d.jamStr||''}','${d.status}','${d.tanggal||''}','${d.jenis||'masuk'}')">Edit</button><button class="btn btn-sm btn-red" onclick="hapusAbsen('${d.id}')">Hapus</button></td></tr>`).join('');
+  // Sort A-Z by nama
+  const sorted=[...data].sort((a,b)=>a.nama.localeCompare(b.nama,'id'));
+  _editRowMap={};
+  sorted.forEach(d=>{_editRowMap[d.id]=d;});
+  tb.innerHTML=sorted.map(d=>{
+    const kelasNama=getKelasNamaFromData(d);
+    const isLibur=liburSet.has(d.tanggal||'');
+    return`<tr${isLibur?' style="background:var(--amber-bg)"':''}><td>${d.nama}</td><td>${kelasNama}</td><td>${d.jamStr||'-'}</td><td><span class="badge ${bc(d.status)}">${d.status}</span>${isLibur?' <span style="font-size:10px;color:var(--amber)">🏖️</span>':''}</td><td style="display:flex;gap:5px"><button class="btn btn-sm btn-blue" data-edit-id="${d.id}">Edit</button><button class="btn btn-sm btn-red" data-del-id="${d.id}">Hapus</button></td></tr>`;
+  }).join('');
+  // Attach events safely (handles any character in nama)
+  tb.querySelectorAll('[data-edit-id]').forEach(btn=>{
+    btn.onclick=()=>{const d=_editRowMap[btn.dataset.editId];if(d)openEditModalSafe(d);};
+  });
+  tb.querySelectorAll('[data-del-id]').forEach(btn=>{
+    btn.onclick=()=>hapusAbsen(btn.dataset.delId);
+  });
 }
-window.filterEditTable=function(){const q=document.getElementById('edit-cari').value.toLowerCase();renderEditTable(q?editDataAll.filter(d=>d.nama.toLowerCase().includes(q)):editDataAll);};
-window.openEditModal=function(id,nama,jam,status,tanggal,sesi){
-  document.getElementById('edit-doc-id').value=id;
-  document.getElementById('edit-nama-val').value=nama;
-  document.getElementById('edit-jam-val').value=jam||'';
-  document.getElementById('edit-status-val').value=status||'Hadir';
-  document.getElementById('edit-tanggal-val').value=tanggal||todayStr();
-  document.getElementById('edit-sesi-val').value=sesi||'masuk';
+function openEditModalSafe(d){
+  document.getElementById('edit-doc-id').value=d.id;
+  document.getElementById('edit-nama-val').value=d.nama;
+  document.getElementById('edit-jam-val').value=d.jamStr||'';
+  document.getElementById('edit-status-val').value=d.status||'Hadir';
+  document.getElementById('edit-tanggal-val').value=d.tanggal||todayStr();
+  document.getElementById('edit-sesi-val').value=d.sesi||d.jenis||'masuk';
   document.getElementById('modal-edit').classList.add('open');
+}
+window.filterEditTable=function(){
+  const q=document.getElementById('edit-cari').value.toLowerCase();
+  const filtered=q?editDataAll.filter(d=>d.nama.toLowerCase().includes(q)):editDataAll;
+  renderEditTable(filtered);
+};
+window.openEditModal=function(id,nama,jam,status,tanggal,sesi){
+  // Legacy inline call - find from map
+  const d=_editRowMap[id]||{id,nama,jamStr:jam,status,tanggal,sesi};
+  openEditModalSafe(d);
 };
 window.simpanEdit=async function(){
   const id=document.getElementById('edit-doc-id').value;
@@ -838,8 +1122,10 @@ window.hapusAbsen=async function(id){if(!confirm('Hapus data absen ini?'))return
 
 window.populateSiswaSelect=function(){
   const kelasId=document.getElementById('iz-kelas').value;
-  const filtered=kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList;
-  document.getElementById('iz-nama').innerHTML='<option value="">-- Pilih --</option>'+filtered.map(s=>`<option>${s.nama}</option>`).join('');
+  const filtered=(kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList).sort((a,b)=>a.nama.localeCompare(b.nama,'id'));
+  const sel=document.getElementById('iz-nama');
+  sel.innerHTML='<option value="">-- Pilih --</option>';
+  filtered.forEach(s=>{const o=document.createElement('option');o.textContent=s.nama;o.value=s.nama;sel.appendChild(o);});
 };
 window.tambahIzin=async function(){
   const nama=document.getElementById('iz-nama').value,jenis=document.getElementById('iz-jenis').value;
@@ -862,8 +1148,11 @@ async function loadIzin(){
   rows.sort((a,b)=>b.tgl1.localeCompare(a.tgl1));
   const tb=document.getElementById('tbl-izin');
   if(!rows.length){tb.innerHTML='<tr><td colspan="6" style="color:var(--hint);text-align:center;padding:16px">Belum ada data</td></tr>';return;}
-  tb.innerHTML=rows.map(d=>`<tr><td>${d.nama}</td><td><span class="badge ${d.jenis==='Izin'?'b-izin':'b-sakit'}">${d.jenis}</span></td><td>${d.tgl1}</td><td>${d.tgl2}</td><td style="color:var(--muted)">${d.ket||'-'}</td><td style="display:flex;gap:5px"><button class="btn btn-sm btn-blue" onclick="openEditIzin('${d.id}','${d.nama}','${d.jenis}','${d.tgl1}','${d.tgl2}','${(d.ket||'').replace(/'/g,'')}')">Edit</button><button class="btn btn-sm btn-red" onclick="hapusIzin('${d.id}')">Hapus</button></td></tr>`).join('');
+  tb.innerHTML=rows.map(d=>{const sid=d.id,sn=d.nama.replace(/"/g,'&quot;'),sk=(d.ket||'').replace(/"/g,'&quot;');return`<tr><td>${d.nama}</td><td><span class=\"badge ${d.jenis==='Izin'?'b-izin':'b-sakit'}\">${d.jenis}</span></td><td>${d.tgl1}</td><td>${d.tgl2}</td><td style=\"color:var(--muted)\">${d.ket||'-'}</td><td style=\"display:flex;gap:5px\"><button class=\"btn btn-sm btn-blue\" data-id=\"${sid}\" data-nama=\"${sn}\" data-jenis=\"${d.jenis}\" data-tgl1=\"${d.tgl1}\" data-tgl2=\"${d.tgl2}\" data-ket=\"${sk}\" onclick=\"openEditIzinBtn(this)\">Edit</button><button class=\"btn btn-sm btn-red\" onclick=\"hapusIzin('${d.id}')\">Hapus</button></td></tr>`}).join('');
 }
+window.openEditIzinBtn=function(btn){
+  openEditIzin(btn.dataset.id,btn.dataset.nama,btn.dataset.jenis,btn.dataset.tgl1,btn.dataset.tgl2,btn.dataset.ket);
+};
 window.openEditIzin=function(id,nama,jenis,tgl1,tgl2,ket){
   ['iz-edit-id','iz-edit-nama','iz-edit-tgl1','iz-edit-tgl2','iz-edit-ket'].forEach((el,i)=>document.getElementById(el).value=[id,nama,tgl1,tgl2,ket][i]);
   document.getElementById('iz-edit-jenis').value=jenis;document.getElementById('modal-izin').classList.add('open');
