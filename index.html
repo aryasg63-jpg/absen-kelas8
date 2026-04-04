@@ -71,8 +71,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .cnt-lbl{font-size:11px;color:var(--muted);margin-top:2px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
 .c-g{color:var(--green)}.c-r{color:var(--red)}.c-b{color:var(--blue)}
 .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.logo-bar{display:flex;align-items:center;gap:10px;padding:.625rem 0;margin-bottom:.875rem;border-bottom:2px solid var(--border)}
-.logo-img{width:50px;height:50px;object-fit:contain;flex-shrink:0}
+.logo-bar{display:flex;align-items:center;gap:12px;padding:.75rem 1rem;margin-bottom:1rem;border-radius:12px;background:var(--surface);border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.logo-img{width:52px;height:52px;object-fit:contain;flex-shrink:0;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.logo-center-text{flex:1;text-align:center}
+.logo-school-name{display:block;font-size:13px;font-weight:800;color:var(--text);letter-spacing:.3px}
+.logo-school-sub{display:block;font-size:10px;color:var(--muted);margin-top:2px;font-weight:500}
 .logo-center-text{flex:1;text-align:center}
 .logo-school-name{display:block;color:var(--text);font-size:13px;font-weight:700}
 .logo-school-sub{display:block;color:var(--muted);font-size:10px;margin-top:1px}
@@ -102,7 +105,8 @@ html.dark body{background:linear-gradient(160deg,#1a2d8a 0%,#3b1a7a 50%,#5a1f90 
 .layout{max-width:440px;margin:0 auto;padding:1.25rem 1rem;}
 /* Flyer header */
 .flyer-header{text-align:center;padding:1.5rem 0 .75rem;position:relative;}
-.flyer-logo{width:72px;height:72px;object-fit:contain;border-radius:50%;box-shadow:0 4px 16px rgba(0,0,0,.3);background:#fff;padding:4px;}
+.flyer-logo{width:68px;height:68px;object-fit:contain;border-radius:50%;box-shadow:0 4px 16px rgba(0,0,0,.3);background:#fff;padding:4px;}
+.flyer-logos{display:flex;gap:16px;justify-content:center;align-items:center;margin-bottom:.5rem;}
 .flyer-school-name{font-size:15px;font-weight:800;color:#fff;letter-spacing:1px;margin-top:.5rem;text-shadow:0 1px 4px rgba(0,0,0,.3);}
 .flyer-school-sub{font-size:11px;font-weight:600;color:rgba(255,255,255,.8);letter-spacing:2px;text-transform:uppercase;}
 /* SCAN HERE title */
@@ -197,10 +201,11 @@ if('serviceWorker' in navigator){
 <div class="layout">
 
 <div class="flyer-header">
-  <img src="smp-sains-lis.png" alt="SMP Sains LIS" class="flyer-logo"
-       onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-  <div style="display:none;width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.9);align-items:center;justify-content:center;margin:0 auto;box-shadow:0 4px 16px rgba(0,0,0,.3)">
-    <span style="font-size:22px;font-weight:900;color:#3a5fe5">SMP</span>
+  <div class="flyer-logos">
+    <img src="yayasan-lis.png" alt="Yayasan LIS" class="flyer-logo"
+         onerror="this.style.opacity='.3'">
+    <img src="smp-sains-lis.png" alt="SMP Sains LIS" class="flyer-logo"
+         onerror="this.style.opacity='.3'">
   </div>
   <div class="flyer-school-name">SMP SAINS</div>
   <div class="flyer-school-sub">Lombok Islamic School</div>
@@ -285,8 +290,8 @@ if('serviceWorker' in navigator){
   </div>
   <div class="admin-link">
     <div class="nav-btns">
-      <a href="login.html" class="nav-btn nav-btn-admin">🔐 Masuk sebagai Admin</a>
-      <a href="wali.html" class="nav-btn nav-btn-wali">👨‍👩‍👧 Portal Wali Murid</a>
+      <a href="login.html" onclick="event.preventDefault();window.location.href='login.html'" class="nav-btn nav-btn-admin">🔐 Masuk sebagai Admin</a>
+      <a href="wali.html" onclick="event.preventDefault();window.location.href='wali.html'" class="nav-btn nav-btn-wali">👨‍👩‍👧 Portal Wali Murid</a>
       <button class="nav-btn" id="btn-save-offline" onclick="simpanDataOffline()">💾 Simpan Data untuk Offline</button>
       <button class="nav-btn nav-btn-danger" onclick="hapusDataLokal()">🗑 Hapus Data Lokal</button>
     </div>
