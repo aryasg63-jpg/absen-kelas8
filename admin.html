@@ -124,30 +124,49 @@ tbody tr:hover td{background:var(--gray)}
 .wm-text{font-size:10px;font-weight:600;letter-spacing:.5px;opacity:.55}
 
 @media print{
-  @page{size:A4 portrait;margin:5mm}
+  @page{
+    size:A4 portrait;
+    margin:10mm;
+  }
+
   body *{visibility:hidden}
   #print-area,#print-area *{visibility:visible}
+
   #print-area{
-    position:fixed;inset:0;background:#fff;
-    display:grid;
-    grid-template-columns:repeat(4,46mm);
-    grid-auto-rows:73mm;
-    gap:3mm;
-    padding:3mm;
-    align-content:start;
+    position:fixed;
+    inset:0;
+    background:#fff;
+
+    display:grid!important;
+
+    grid-template-columns:repeat(3,55mm)!important;
+    grid-template-rows:repeat(3,75mm)!important;
+
+    column-gap:4px;
+    row-gap:6px; /* 🔥 lebih besar biar pasti kelihatan */
+
     justify-content:center;
+    align-content:center;
+
+    padding:5mm;
   }
+
   .print-qr-item{
-    page-break-inside:avoid;
-    width:46mm;height:73mm;
-    overflow:hidden;
-    border-radius:4px;
-    box-shadow:0 0 2px rgba(0,0,0,.25);
+    width:55mm!important;
+    height:75mm!important;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    page-break-inside:avoid!important;
+    break-inside:avoid!important;
   }
+
   .print-qr-item img{
-    display:block!important;
-    width:46mm!important;height:73mm!important;
-    object-fit:fill;
+    width:100%!important;
+    height:100%!important;
+    object-fit:contain!important;
   }
 }
 @media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}.frow,.frow3{grid-template-columns:1fr}}
@@ -806,8 +825,12 @@ window.printSemuaQR=function(){
     .sort((a,b)=>a.nama.localeCompare(b.nama,'id',{sensitivity:'base'}));
   if(!filtered.length){alert('Belum ada siswa');return;}
   const area=document.getElementById('print-area');
-  area.innerHTML='<p style="text-align:center;padding:20px;font-size:13px">⏳ Menyiapkan flyer untuk dicetak...</p>';
-  area.style.display='block';
+  // Loading overlay terpisah — jangan sentuh area agar grid CSS tidak rusak
+  const loadOverlay=document.createElement('div');
+  loadOverlay.id='print-load-overlay';
+  loadOverlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;color:#fff;font-size:15px;font-weight:700;flex-direction:column;gap:10px;';
+  loadOverlay.innerHTML='<div style="font-size:28px">⏳</div><div>Menyiapkan kartu QR untuk dicetak...</div><div id="print-progress" style="font-size:12px;opacity:.7">0 / 0</div>';
+  document.body.appendChild(loadOverlay);
   let done=0;
   const total=filtered.length;
   const imgs=[];
@@ -832,19 +855,25 @@ window.printSemuaQR=function(){
           makeFlyerImg(qrEl,s.nama,s.kelasNama||'',s.kelasId||'',imgDataUrl=>{
             try{document.body.removeChild(tmpDiv);}catch(e){}
             if(imgDataUrl)imgs[i]={src:imgDataUrl,nama:s.nama,kelas:s.kelasNama||''};
-            done++;if(done===total)showPrint();
+            done++;
+            const prog=document.getElementById('print-progress');
+            if(prog)prog.textContent=done+' / '+total;
+            if(done===total)showPrint();
           });
         } else if(++tries>80){
           clearInterval(poll);try{document.body.removeChild(tmpDiv);}catch(e){}
-          done++;if(done===total)showPrint();
+          done++;
+          const prog2=document.getElementById('print-progress');
+          if(prog2)prog2.textContent=done+' / '+total;
+          if(done===total)showPrint();
         }
       },50);
     },i*120);
   });
 
   function makeFlyerImg(qrEl,nama,kelasNama,kelasId,callback){
-    // Portrait ID card: 460x730 px (10x scale dari 46x73mm)
-    const W=460,H=730;
+    // Portrait ID card: 630x1000 px (10x scale dari 63x100mm)
+    const W=630,H=1000;
     const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
     const cx=canvas.getContext('2d');
 
@@ -864,18 +893,18 @@ window.printSemuaQR=function(){
     // Strip gradien atas
     const topStrip=cx.createLinearGradient(0,0,W,0);
     topStrip.addColorStop(0,'#3050ff');topStrip.addColorStop(1,'#7030d0');
-    cx.fillStyle=topStrip;cx.fillRect(0,0,W,8);
+    cx.fillStyle=topStrip;cx.fillRect(0,0,W,11);
     // Strip gradien bawah
-    cx.fillStyle=topStrip;cx.fillRect(0,H-8,W,8);
+    cx.fillStyle=topStrip;cx.fillRect(0,H-11,W,11);
     // Dots kanan atas
     cx.fillStyle='rgba(255,255,255,0.22)';
-    for(let r=0;r<3;r++)for(let col=0;col<3;col++){cx.beginPath();cx.arc(W-12-col*12,14+r*12,2.5,0,Math.PI*2);cx.fill();}
+    for(let r=0;r<3;r++)for(let col=0;col<3;col++){cx.beginPath();cx.arc(W-16-col*16,18+r*16,3.5,0,Math.PI*2);cx.fill();}
     // Dots kiri bawah
     cx.fillStyle='rgba(255,255,255,0.14)';
-    for(let r=0;r<3;r++)for(let col=0;col<3;col++){cx.beginPath();cx.arc(12+col*12,H-14-r*12,2.5,0,Math.PI*2);cx.fill();}
+    for(let r=0;r<3;r++)for(let col=0;col<3;col++){cx.beginPath();cx.arc(16+col*16,H-18-r*16,3.5,0,Math.PI*2);cx.fill();}
 
     // ── Logo SMP (lingkaran, tengah atas) ─────────────────────────
-    const lsz=54,lx=W/2-lsz/2,ly=18;
+    const lsz=74,lx=W/2-lsz/2,ly=24;
     // Glow ring
     cx.save();cx.shadowColor='rgba(80,150,255,0.7)';cx.shadowBlur=16;
     cx.beginPath();cx.arc(W/2,ly+lsz/2,lsz/2+4,0,Math.PI*2);
@@ -885,19 +914,19 @@ window.printSemuaQR=function(){
     cx.fillStyle='rgba(255,255,255,0.08)';cx.fill();cx.restore();
 
     // ── Nama sekolah ──────────────────────────────────────────────
-    const sn1Y=ly+lsz+14;
+    const sn1Y=ly+lsz+18;
     cx.textAlign='center';
     cx.fillStyle='rgba(160,195,255,0.88)';
-    cx.font='bold 14px Poppins,Arial,sans-serif';
+    cx.font='bold 18px Poppins,Arial,sans-serif';
     cx.fillText('SMP SAINS',W/2,sn1Y);
-    cx.font='bold 10px Poppins,Arial,sans-serif';
+    cx.font='bold 13px Poppins,Arial,sans-serif';
     cx.fillStyle='rgba(120,160,255,0.60)';
-    cx.fillText('LOMBOK ISLAMIC SCHOOL',W/2,sn1Y+14);
+    cx.fillText('LOMBOK ISLAMIC SCHOOL',W/2,sn1Y+18);
 
     // ── SCAN HERE ─────────────────────────────────────────────────
-    const scanY=sn1Y+14+38;
+    const scanY=sn1Y+18+50;
     cx.save();cx.textAlign='center';
-    cx.font='800 36px Poppins,"Arial Black",Arial,sans-serif';
+    cx.font='800 48px Poppins,"Arial Black",Arial,sans-serif';
     cx.shadowColor='rgba(0,200,255,0.85)';cx.shadowBlur=30;
     cx.fillStyle='rgba(255,255,255,0.95)';cx.fillText('SCAN HERE',W/2,scanY);
     cx.shadowColor='rgba(0,150,255,1)';cx.shadowBlur=50;
@@ -905,33 +934,33 @@ window.printSemuaQR=function(){
     cx.restore();
 
     // FOR ABSEN
-    const faY=scanY+20;
+    const faY=scanY+26;
     cx.save();cx.textAlign='center';
     cx.fillStyle='rgba(160,200,255,0.82)';
-    cx.font='600 12px Poppins,Arial,sans-serif';
+    cx.font='600 16px Poppins,Arial,sans-serif';
     cx.fillText('FOR ABSEN',W/2,faY);cx.restore();
 
     // ── Kartu putih (QR area) ─────────────────────────────────────
-    const bx=16,bw=W-32,by=faY+12;
-    const qsz=bw-32,qx=bx+16,qy=by+14;
-    const niY=qy+qsz+16,ciY=niY+16;
-    const bh=(kelasNama?ciY+14:niY+10)-by;
-    const br=12;
+    const bx=20,bw=W-40,by=faY+16;
+    const qsz=bw-44,qx=bx+22,qy=by+18;
+    const niY=qy+qsz+20,ciY=niY+20;
+    const bh=(kelasNama?ciY+18:niY+14)-by;
+    const br=16;
     function rrect(x,y,w,h,r){
       cx.beginPath();
       if(cx.roundRect)cx.roundRect(x,y,w,h,r);
       else{cx.moveTo(x+r,y);cx.lineTo(x+w-r,y);cx.arcTo(x+w,y,x+w,y+r,r);cx.lineTo(x+w,y+h-r);cx.arcTo(x+w,y+h,x+w-r,y+h,r);cx.lineTo(x+r,y+h);cx.arcTo(x,y+h,x,y+h-r,r);cx.lineTo(x,y+r);cx.arcTo(x,y,x+r,y,r);cx.closePath();}
     }
     // Shadow
-    cx.save();cx.shadowColor='rgba(0,0,50,0.6)';cx.shadowBlur=20;cx.shadowOffsetY=6;
+    cx.save();cx.shadowColor='rgba(0,0,50,0.6)';cx.shadowBlur=26;cx.shadowOffsetY=8;
     cx.fillStyle='#ffffff';rrect(bx,by,bw,bh,br);cx.fill();cx.restore();
     // Border
-    cx.save();cx.strokeStyle='rgba(0,0,30,0.85)';cx.lineWidth=5;rrect(bx,by,bw,bh,br);cx.stroke();cx.restore();
+    cx.save();cx.strokeStyle='rgba(0,0,30,0.85)';cx.lineWidth=7;rrect(bx,by,bw,bh,br);cx.stroke();cx.restore();
     // Outer glow ring
     cx.save();cx.shadowColor='rgba(80,130,255,0.4)';cx.shadowBlur=12;
     cx.strokeStyle='rgba(80,130,255,0.18)';cx.lineWidth=1;rrect(bx-2,by-2,bw+4,bh+4,br+2);cx.stroke();cx.restore();
     // Corner brackets
-    const bp=10,bl=22,bww=2.5;
+    const bp=13,bl=30,bww=3.5;
     const x1=bx+bp,y1=by+bp,x2=bx+bw-bp,y2=by+bh-bp;
     cx.strokeStyle='#2255cc';cx.lineWidth=bww;cx.lineCap='square';
     [[x1,y1+bl,x1,y1,x1+bl,y1],[x2-bl,y1,x2,y1,x2,y1+bl],
@@ -946,19 +975,19 @@ window.printSemuaQR=function(){
     function afterQR(){
       // Nama siswa
       cx.textAlign='center';cx.fillStyle='#0d0d22';
-      cx.font='bold 14px Poppins,Arial,sans-serif';
+      cx.font='bold 18px Poppins,Arial,sans-serif';
       let dn=nama;while(cx.measureText(dn).width>bw-16&&dn.length>4)dn=dn.slice(0,-1);
       if(dn!==nama)dn=dn.trim()+'…';
       cx.fillText(dn,W/2,niY);
       if(kelasNama){
-        cx.fillStyle='#1a3fb4';cx.font='600 11px Poppins,Arial,sans-serif';
+        cx.fillStyle='#1a3fb4';cx.font='600 14px Poppins,Arial,sans-serif';
         cx.fillText(kelasNama,W/2,ciY);
       }
 
       // ── THANK YOU ────────────────────────────────────────────────
       const tyY=by+bh+32;
       cx.save();cx.textAlign='center';
-      cx.font='800 28px Poppins,"Arial Black",Arial,sans-serif';
+      cx.font='800 38px Poppins,"Arial Black",Arial,sans-serif';
       cx.shadowColor='rgba(0,200,255,0.8)';cx.shadowBlur=25;
       cx.fillStyle='rgba(255,255,255,0.95)';cx.fillText('THANK YOU',W/2,tyY);
       cx.shadowColor='rgba(0,150,255,1)';cx.shadowBlur=40;
@@ -966,9 +995,9 @@ window.printSemuaQR=function(){
       cx.restore();
 
       // Watermark
-      cx.fillStyle='rgba(0,0,30,0.3)';cx.fillRect(0,H-16,W,16);
+      cx.fillStyle='rgba(0,0,30,0.3)';cx.fillRect(0,H-22,W,22);
       cx.fillStyle='rgba(160,190,255,0.50)';
-      cx.font='6.5px Arial,sans-serif';cx.textAlign='center';
+      cx.font='9px Arial,sans-serif';cx.textAlign='center';
       cx.fillText('By-Kali-Linux-Arya  |  SMP Sains Lombok Islamic School',W/2,H-5);
 
       // Logo async
@@ -989,15 +1018,24 @@ window.printSemuaQR=function(){
   }
 
   function showPrint(){
-    // Sort by index order
     area.innerHTML='';
     imgs.forEach(item=>{
       if(!item)return;
       const div=document.createElement('div');div.className='print-qr-item';
-      const img=document.createElement('img');img.src=item.src;img.style.cssText='width:100%;height:auto;display:block;border-radius:8px;';
+      const img=document.createElement('img');img.src=item.src;
+      // JANGAN set inline style width/height — biarkan @media print CSS yang atur
+      img.style.cssText='display:block;width:100%;height:100%;object-fit:fill;';
       div.appendChild(img);area.appendChild(div);
     });
-    setTimeout(()=>{window.print();area.innerHTML='';area.style.display='none';},600);
+    // Hapus loading overlay
+    const ol=document.getElementById('print-load-overlay');if(ol)ol.remove();
+    // Hapus inline display style agar @media print { display:grid!important } bekerja
+    area.removeAttribute('style');
+    // Beri waktu browser render sebelum print
+    setTimeout(()=>{
+      window.print();
+      setTimeout(()=>{area.innerHTML='';area.style.display='none';},300);
+    },800);
   }
 };
 
