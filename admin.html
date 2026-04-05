@@ -435,15 +435,25 @@ let kelasList=[],siswaList=[],rekapData=[],editDataAll=[],liburSet=new Set();
 
 // ── Libur: Firestore + localStorage cache ──────────────────────────────
 async function loadLibur(){
-  try{const cached=localStorage.getItem('hari_libur_v2');if(cached)liburSet=new Set(JSON.parse(cached));}catch(e){}
+  // 1. Load cache dulu agar cepat (offline-first)
+  try{
+    const cached=localStorage.getItem('hari_libur_v2');
+    if(cached)liburSet=new Set(JSON.parse(cached));
+  }catch(e){}
+  // 2. Sync dari Firestore (koleksi 'libur', doc 'set')
   try{
     const snap=await getDoc(doc(db,'libur','set'));
     if(snap.exists()){
       const arr=snap.data().tanggal||[];
       liburSet=new Set(arr);
       localStorage.setItem('hari_libur_v2',JSON.stringify(arr));
+      console.log('[Libur] Sync dari server: '+arr.length+' hari libur');
+    } else {
+      console.log('[Libur] Dokumen libur belum ada di server');
     }
-  }catch(e){console.warn('loadLibur offline:',e);}
+  }catch(e){
+    console.warn('[Libur] Offline/error, pakai cache lokal:',e.message||e);
+  }
 }
 async function saveLibur(){
   const arr=[...liburSet];
@@ -609,6 +619,7 @@ async function init(){
   });
 
   await openIDB();
+  await loadLibur(); // Ambil data libur terbaru dari Firestore
   await loadKelas();await loadSiswa();loadRekap();
 
   // Cek dan sync pending saat pertama load (kalau online)
