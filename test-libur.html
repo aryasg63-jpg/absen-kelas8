@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Test Hari Libur — Firebase</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',sans-serif}
+body{background:#0f1117;color:#e0e0ff;min-height:100vh;padding:24px}
+.card{background:#1a1d2e;border:1px solid #2a2d4e;border-radius:14px;padding:20px;margin-bottom:16px}
+h1{font-size:18px;font-weight:800;color:#7cb9ff;margin-bottom:4px}
+.sub{font-size:12px;color:#666;margin-bottom:20px}
+.status-bar{padding:10px 16px;border-radius:10px;font-size:13px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.s-loading{background:#1a2a3a;border:1px solid #2a4a6a;color:#7cb9ff}
+.s-ok{background:#0a2a1a;border:1px solid #1a6a3a;color:#4dffaa}
+.s-err{background:#2a0a0a;border:1px solid #6a1a1a;color:#ff7070}
+.s-saving{background:#2a2a0a;border:1px solid #6a5a00;color:#ffcc44}
+.pulse{width:10px;height:10px;border-radius:50%;flex-shrink:0;animation:pulse 1.2s infinite}
+.p-blue{background:#4488ff}
+.p-green{background:#44ff88}
+.p-red{background:#ff4444}
+.p-yellow{background:#ffcc00}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+.grid-bulan{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:12px}
+.hari-label{text-align:center;font-size:10px;color:#555;font-weight:700;padding:4px}
+.hari-btn{
+  aspect-ratio:1;border-radius:8px;border:1px solid #2a2d4e;
+  background:#1a1d2e;color:#aaa;font-size:11px;font-weight:600;
+  cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;
+}
+.hari-btn:hover{border-color:#4488ff;color:#fff;background:#1a2a3a}
+.hari-btn.libur{background:#7c3aed;border-color:#9d5aff;color:#fff;box-shadow:0 0 8px rgba(124,58,237,.5)}
+.hari-btn.hari-ini{border-color:#ffcc00;color:#ffcc00}
+.hari-btn.hari-ini.libur{border-color:#ffcc00}
+.hari-btn.kosong{background:transparent;border-color:transparent;cursor:default}
+
+.bulan-nav{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.bulan-nav h2{flex:1;text-align:center;font-size:15px;font-weight:700;color:#e0e0ff}
+.bulan-nav button{background:#2a2d4e;border:1px solid #3a3d6e;color:#aaa;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:14px}
+.bulan-nav button:hover{background:#3a3d6e;color:#fff}
+
+.list-libur{margin-top:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#7c3aed22;border:1px solid #7c3aed55;border-radius:99px;padding:4px 12px;font-size:12px;font-weight:600;color:#c4a3ff;margin:4px}
+.chip-del{background:none;border:none;color:#ff7070;cursor:pointer;font-size:14px;padding:0;line-height:1}
+
+.log-area{background:#0a0a14;border:1px solid #1a1d2e;border-radius:10px;padding:12px;font-size:11px;font-family:monospace;color:#888;max-height:150px;overflow-y:auto;margin-top:12px}
+.log-ok{color:#4dffaa}
+.log-err{color:#ff7070}
+.log-info{color:#7cb9ff}
+
+.db-path{background:#0a0a14;border:1px solid #1a1d2e;border-radius:8px;padding:8px 12px;font-family:monospace;font-size:11px;color:#666;margin-top:8px}
+.db-path span{color:#7cb9ff}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>🗓️ Test Hari Libur — Firebase Firestore</h1>
+  <p class="sub">Klik tanggal untuk toggle libur. Data langsung disimpan ke server.</p>
+  <div class="db-path">Firestore path: <span>libur / set → { tanggal: [...] }</span></div>
+</div>
+
+<div class="card">
+  <div id="status" class="status-bar s-loading">
+    <div class="pulse p-blue"></div>
+    <span>Menghubungkan ke Firebase...</span>
+  </div>
+
+  <div class="bulan-nav">
+    <button onclick="gantibulan(-1)">‹</button>
+    <h2 id="judul-bulan">—</h2>
+    <button onclick="gantibulan(1)">›</button>
+  </div>
+
+  <div class="grid-bulan" id="grid-header">
+    <div class="hari-label">Sen</div>
+    <div class="hari-label">Sel</div>
+    <div class="hari-label">Rab</div>
+    <div class="hari-label">Kam</div>
+    <div class="hari-label">Jum</div>
+    <div class="hari-label">Sab</div>
+    <div class="hari-label">Min</div>
+  </div>
+  <div class="grid-bulan" id="grid-hari"></div>
+</div>
+
+<div class="card">
+  <div style="font-size:13px;font-weight:700;color:#c4a3ff;margin-bottom:6px">
+    📋 Semua hari libur di server (<span id="total-libur">0</span> hari)
+  </div>
+  <div id="list-libur" class="list-libur">
+    <span style="color:#555;font-size:12px">Memuat...</span>
+  </div>
+  <div class="log-area" id="log-area">
+    <span class="log-info">Menunggu koneksi Firebase...</span>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, Timestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDlCnUvgyDT-oTfJJ-nxcPWkhpY_b6JeBw",
+  authDomain: "absen-kelas8.firebaseapp.com",
+  projectId: "absen-kelas8",
+  storageBucket: "absen-kelas8.firebasestorage.app",
+  messagingSenderId: "636560501063",
+  appId: "1:636560501063:web:4384206e2a3cd94151c462"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+let liburSet = new Set();
+let viewYear = new Date().getFullYear();
+let viewMonth = new Date().getMonth(); // 0-based
+const today = new Date().toISOString().slice(0,10);
+
+// ── Logging ────────────────────────────────────────────────────────
+const logEl = document.getElementById('log-area');
+function log(msg, type='info') {
+  const t = new Date().toLocaleTimeString('id-ID');
+  const span = document.createElement('div');
+  span.className = 'log-'+type;
+  span.textContent = `[${t}] ${msg}`;
+  logEl.appendChild(span);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ── Status bar ─────────────────────────────────────────────────────
+function setStatus(msg, type) {
+  const el = document.getElementById('status');
+  el.className = 'status-bar s-'+type;
+  const icons = {loading:'p-blue',ok:'p-green',err:'p-red',saving:'p-yellow'};
+  el.innerHTML = `<div class="pulse ${icons[type]||'p-blue'}"></div><span>${msg}</span>`;
+}
+
+// ── Load dari Firestore ────────────────────────────────────────────
+async function loadLibur() {
+  setStatus('Mengambil data dari Firebase...', 'loading');
+  log('Membaca doc: libur/set dari Firestore...');
+  try {
+    const snap = await getDoc(doc(db, 'libur', 'set'));
+    if (snap.exists()) {
+      const arr = snap.data().tanggal || [];
+      liburSet = new Set(arr);
+      const upd = snap.data().updatedAt;
+      const updStr = upd ? new Date(upd.seconds*1000).toLocaleString('id-ID') : '—';
+      log(`✅ Berhasil! ${arr.length} hari libur dimuat. Update terakhir: ${updStr}`, 'ok');
+      setStatus(`✅ Terhubung — ${arr.length} hari libur dari server`, 'ok');
+    } else {
+      liburSet = new Set();
+      log('⚠️ Dokumen libur/set belum ada di Firestore (belum pernah disimpan)', 'info');
+      setStatus('✅ Terhubung — belum ada data libur', 'ok');
+    }
+  } catch(e) {
+    log('❌ Error: ' + (e.message||e), 'err');
+    setStatus('❌ Gagal terhubung: ' + (e.message||e), 'err');
+  }
+  renderKalender();
+  renderList();
+}
+
+// ── Simpan ke Firestore ────────────────────────────────────────────
+async function saveLibur() {
+  const arr = [...liburSet].sort();
+  setStatus('💾 Menyimpan ke Firebase...', 'saving');
+  log(`Menyimpan ${arr.length} hari libur ke server...`);
+  try {
+    await setDoc(doc(db, 'libur', 'set'), {
+      tanggal: arr,
+      updatedAt: Timestamp.now()
+    });
+    log(`✅ Tersimpan! ${arr.length} hari libur → doc libur/set`, 'ok');
+    setStatus(`✅ Tersimpan — ${arr.length} hari libur di server`, 'ok');
+  } catch(e) {
+    log('❌ Gagal simpan: ' + (e.message||e), 'err');
+    setStatus('❌ Gagal simpan: ' + (e.message||e), 'err');
+  }
+  renderList();
+}
+
+// ── Toggle tanggal ─────────────────────────────────────────────────
+window.toggleTgl = async function(tgl) {
+  if (liburSet.has(tgl)) {
+    liburSet.delete(tgl);
+    log(`➖ Hapus libur: ${tgl}`);
+  } else {
+    liburSet.add(tgl);
+    log(`➕ Tambah libur: ${tgl}`);
+  }
+  renderKalender();
+  await saveLibur();
+};
+
+// ── Render kalender ────────────────────────────────────────────────
+function renderKalender() {
+  const namaBulan = new Date(viewYear, viewMonth, 1)
+    .toLocaleDateString('id-ID', {month:'long',year:'numeric'});
+  document.getElementById('judul-bulan').textContent = namaBulan;
+
+  const grid = document.getElementById('grid-hari');
+  grid.innerHTML = '';
+
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+  // Konversi ke Senin-pertama (0=Mon)
+  const offset = (firstDay === 0) ? 6 : firstDay - 1;
+
+  for (let i = 0; i < offset; i++) {
+    const d = document.createElement('div');
+    d.className = 'hari-btn kosong';
+    grid.appendChild(d);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const tgl = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const btn = document.createElement('button');
+    btn.className = 'hari-btn' + (liburSet.has(tgl) ? ' libur' : '') + (tgl===today ? ' hari-ini' : '');
+    btn.textContent = d;
+    btn.title = tgl + (liburSet.has(tgl) ? ' (Libur)' : '');
+    btn.onclick = () => window.toggleTgl(tgl);
+    grid.appendChild(btn);
+  }
+}
+
+// ── Render list semua libur ────────────────────────────────────────
+function renderList() {
+  const arr = [...liburSet].sort();
+  document.getElementById('total-libur').textContent = arr.length;
+  const el = document.getElementById('list-libur');
+  if (!arr.length) {
+    el.innerHTML = '<span style="color:#555;font-size:12px">Belum ada hari libur tersimpan</span>';
+    return;
+  }
+  el.innerHTML = arr.map(tgl => {
+    const fmt = new Date(tgl+'T00:00:00').toLocaleDateString('id-ID',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+    return `<span class="chip">${fmt} <button class="chip-del" onclick="window.toggleTgl('${tgl}')" title="Hapus">✕</button></span>`;
+  }).join('');
+}
+
+// ── Navigasi bulan ─────────────────────────────────────────────────
+window.gantibulan = function(d) {
+  viewMonth += d;
+  if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+  if (viewMonth < 0)  { viewMonth = 11; viewYear--; }
+  renderKalender();
+};
+
+// ── Start ──────────────────────────────────────────────────────────
+loadLibur();
+</script>
+</body>
+</html>
