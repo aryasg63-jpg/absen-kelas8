@@ -124,28 +124,29 @@ tbody tr:hover td{background:var(--gray)}
 .wm-text{font-size:10px;font-weight:600;letter-spacing:.5px;opacity:.55}
 
 @media print{
-  @page{size:A4 landscape;margin:6mm}
+  @page{size:A4 portrait;margin:5mm}
   body *{visibility:hidden}
   #print-area,#print-area *{visibility:visible}
   #print-area{
     position:fixed;inset:0;background:#fff;
     display:grid;
-    grid-template-columns:repeat(3,85.6mm);
-    grid-auto-rows:54mm;
-    gap:4mm;
-    padding:4mm;
+    grid-template-columns:repeat(4,46mm);
+    grid-auto-rows:73mm;
+    gap:3mm;
+    padding:3mm;
     align-content:start;
     justify-content:center;
   }
   .print-qr-item{
     page-break-inside:avoid;
-    width:85.6mm;height:54mm;
+    width:46mm;height:73mm;
     overflow:hidden;
-    border-radius:5px;
+    border-radius:4px;
+    box-shadow:0 0 2px rgba(0,0,0,.25);
   }
   .print-qr-item img{
     display:block!important;
-    width:85.6mm!important;height:54mm!important;
+    width:46mm!important;height:73mm!important;
     object-fit:fill;
   }
 }
@@ -403,7 +404,7 @@ if('serviceWorker' in navigator){
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, setDoc, doc, updateDoc, deleteDoc, query, where, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig={apiKey:"AIzaSyDlCnUvgyDT-oTfJJ-nxcPWkhpY_b6JeBw",authDomain:"absen-kelas8.firebaseapp.com",projectId:"absen-kelas8",storageBucket:"absen-kelas8.firebasestorage.app",messagingSenderId:"636560501063",appId:"1:636560501063:web:4384206e2a3cd94151c462"};
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
@@ -413,10 +414,29 @@ const MULAI_DATE='2026-04-01';// Tanggal sistem mulai aktif
 function nowMonth(){const n=new Date();return`${n.getFullYear()}-${pad(n.getMonth()+1)}`}
 let kelasList=[],siswaList=[],rekapData=[],editDataAll=[],liburSet=new Set();
 
-// 25002500 Hari Libur 25002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500250025002500
-function loadLibur(){try{const saved=localStorage.getItem('hari_libur');if(saved)liburSet=new Set(JSON.parse(saved));}catch(e){}}
-function saveLibur(){localStorage.setItem('hari_libur',JSON.stringify([...liburSet]));}
-window.toggleLibur=function(tgl){if(liburSet.has(tgl)){liburSet.delete(tgl);}else{liburSet.add(tgl);}saveLibur();};
+// ── Libur: Firestore + localStorage cache ──────────────────────────────
+async function loadLibur(){
+  try{const cached=localStorage.getItem('hari_libur_v2');if(cached)liburSet=new Set(JSON.parse(cached));}catch(e){}
+  try{
+    const snap=await getDoc(doc(db,'libur','set'));
+    if(snap.exists()){
+      const arr=snap.data().tanggal||[];
+      liburSet=new Set(arr);
+      localStorage.setItem('hari_libur_v2',JSON.stringify(arr));
+    }
+  }catch(e){console.warn('loadLibur offline:',e);}
+}
+async function saveLibur(){
+  const arr=[...liburSet];
+  localStorage.setItem('hari_libur_v2',JSON.stringify(arr));
+  try{
+    await setDoc(doc(db,'libur','set'),{tanggal:arr,updatedAt:Timestamp.now()});
+  }catch(e){console.warn('saveLibur offline:',e);}
+}
+window.toggleLibur=async function(tgl){
+  if(liburSet.has(tgl)){liburSet.delete(tgl);}else{liburSet.add(tgl);}
+  await saveLibur();
+};
 loadLibur();
 
 window.toggleDark=function(){const d=document.documentElement.classList.toggle('dark');localStorage.setItem('dark',d?'1':'0');document.getElementById('dark-toggle').textContent=d?'☀️':'🌙';};
@@ -823,153 +843,149 @@ window.printSemuaQR=function(){
   });
 
   function makeFlyerImg(qrEl,nama,kelasNama,kelasId,callback){
-    // Kartu ATM landscape: 856x540 px (10x scale dari 85.6x54mm)
-    const W=856,H=540;
+    // Portrait ID card: 460x730 px (10x scale dari 46x73mm)
+    const W=460,H=730;
     const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
     const cx=canvas.getContext('2d');
 
-    // ── Background: gelap dengan overlay blur-like gradient ──────────
+    // ── Background gelap dengan glow biru ──────────────────────────
     const grad=cx.createLinearGradient(0,0,W,H);
-    grad.addColorStop(0,'#0d0d28');
-    grad.addColorStop(0.45,'#1a1060');
-    grad.addColorStop(1,'#0d0d28');
+    grad.addColorStop(0,'#0a0a20');grad.addColorStop(0.5,'#141060');grad.addColorStop(1,'#0a0a20');
     cx.fillStyle=grad;cx.fillRect(0,0,W,H);
-
-    // Overlay glow biru tengah (efek depth)
-    const glow=cx.createRadialGradient(W*0.35,H/2,0,W*0.35,H/2,W*0.5);
-    glow.addColorStop(0,'rgba(0,120,255,0.22)');
-    glow.addColorStop(1,'rgba(0,0,0,0)');
+    // Glow overlay tengah
+    const glow=cx.createRadialGradient(W/2,H*0.4,0,W/2,H*0.4,W*0.6);
+    glow.addColorStop(0,'rgba(0,120,255,0.20)');glow.addColorStop(1,'rgba(0,0,0,0)');
     cx.fillStyle=glow;cx.fillRect(0,0,W,H);
-
-    // Garis grid halus (efek tech/kartu)
-    cx.save();cx.strokeStyle='rgba(255,255,255,0.04)';cx.lineWidth=1;
-    for(let x=0;x<W;x+=40){cx.beginPath();cx.moveTo(x,0);cx.lineTo(x,H);cx.stroke();}
-    for(let y=0;y<H;y+=40){cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke();}
+    // Grid garis halus
+    cx.save();cx.strokeStyle='rgba(255,255,255,0.025)';cx.lineWidth=1;
+    for(let x=0;x<W;x+=30){cx.beginPath();cx.moveTo(x,0);cx.lineTo(x,H);cx.stroke();}
+    for(let y=0;y<H;y+=30){cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke();}
     cx.restore();
+    // Strip gradien atas
+    const topStrip=cx.createLinearGradient(0,0,W,0);
+    topStrip.addColorStop(0,'#3050ff');topStrip.addColorStop(1,'#7030d0');
+    cx.fillStyle=topStrip;cx.fillRect(0,0,W,8);
+    // Strip gradien bawah
+    cx.fillStyle=topStrip;cx.fillRect(0,H-8,W,8);
+    // Dots kanan atas
+    cx.fillStyle='rgba(255,255,255,0.22)';
+    for(let r=0;r<3;r++)for(let col=0;col<3;col++){cx.beginPath();cx.arc(W-12-col*12,14+r*12,2.5,0,Math.PI*2);cx.fill();}
+    // Dots kiri bawah
+    cx.fillStyle='rgba(255,255,255,0.14)';
+    for(let r=0;r<3;r++)for(let col=0;col<3;col++){cx.beginPath();cx.arc(12+col*12,H-14-r*12,2.5,0,Math.PI*2);cx.fill();}
 
-    // Strip biru kiri (aksen vertikal)
-    const stripGrad=cx.createLinearGradient(0,0,0,H);
-    stripGrad.addColorStop(0,'#4060ff');stripGrad.addColorStop(1,'#8040e0');
-    cx.fillStyle=stripGrad;cx.fillRect(0,0,8,H);
+    // ── Logo SMP (lingkaran, tengah atas) ─────────────────────────
+    const lsz=54,lx=W/2-lsz/2,ly=18;
+    // Glow ring
+    cx.save();cx.shadowColor='rgba(80,150,255,0.7)';cx.shadowBlur=16;
+    cx.beginPath();cx.arc(W/2,ly+lsz/2,lsz/2+4,0,Math.PI*2);
+    cx.strokeStyle='rgba(100,160,255,0.55)';cx.lineWidth=1.5;cx.stroke();cx.restore();
+    // Placeholder
+    cx.save();cx.beginPath();cx.arc(W/2,ly+lsz/2,lsz/2,0,Math.PI*2);
+    cx.fillStyle='rgba(255,255,255,0.08)';cx.fill();cx.restore();
 
-    // Dot pattern pojok kanan atas
-    cx.fillStyle='rgba(255,255,255,0.18)';
-    for(let r=0;r<4;r++)for(let col=0;col<4;col++){
-      cx.beginPath();cx.arc(W-20-col*16,18+r*16,3.5,0,Math.PI*2);cx.fill();
-    }
-
-    // ── Kiri: logo + nama sekolah ─────────────────────────────────────
-    const logoSz=80,logoPad=30,logoY=(H-logoSz)/2;
-
-    // Logo placeholder (glow ring)
-    cx.save();
-    cx.shadowColor='rgba(80,140,255,0.6)';cx.shadowBlur=20;
-    cx.beginPath();cx.arc(logoPad+logoSz/2,H/2,logoSz/2+3,0,Math.PI*2);
-    cx.strokeStyle='rgba(80,140,255,0.7)';cx.lineWidth=2;cx.stroke();
-    cx.restore();
-
-    // Nama sekolah (kiri bawah logo)
-    cx.textAlign='left';
-    cx.fillStyle='rgba(160,190,255,0.75)';
-    cx.font='600 13px Poppins,Arial,sans-serif';
-    cx.fillText('SMP SAINS',logoPad*2+logoSz+12,H/2-28);
-    cx.fillStyle='rgba(120,160,255,0.55)';
-    cx.font='600 10px Poppins,Arial,sans-serif';
-    cx.fillText('LOMBOK ISLAMIC SCHOOL',logoPad*2+logoSz+12,H/2-12);
-
-    // ── Teks SCAN HERE di tengah (glow) ──────────────────────────────
-    const midX=W*0.42;
-    cx.save();
+    // ── Nama sekolah ──────────────────────────────────────────────
+    const sn1Y=ly+lsz+14;
     cx.textAlign='center';
-    // Glow effect layer 1
-    cx.shadowColor='rgba(0,200,255,0.8)';cx.shadowBlur=40;
-    cx.fillStyle='rgba(255,255,255,0.9)';
-    cx.font='800 58px Poppins,Arial,sans-serif';
-    cx.fillText('SCAN HERE',midX,H/2-2);
-    // Glow layer 2 (lebih terang)
-    cx.shadowColor='rgba(0,150,255,1)';cx.shadowBlur=60;
-    cx.fillStyle='rgba(255,255,255,1)';
-    cx.font='800 58px Poppins,Arial,sans-serif';
-    cx.fillText('SCAN HERE',midX,H/2-2);
+    cx.fillStyle='rgba(160,195,255,0.88)';
+    cx.font='bold 14px Poppins,Arial,sans-serif';
+    cx.fillText('SMP SAINS',W/2,sn1Y);
+    cx.font='bold 10px Poppins,Arial,sans-serif';
+    cx.fillStyle='rgba(120,160,255,0.60)';
+    cx.fillText('LOMBOK ISLAMIC SCHOOL',W/2,sn1Y+14);
+
+    // ── SCAN HERE ─────────────────────────────────────────────────
+    const scanY=sn1Y+14+38;
+    cx.save();cx.textAlign='center';
+    cx.font='800 36px Poppins,"Arial Black",Arial,sans-serif';
+    cx.shadowColor='rgba(0,200,255,0.85)';cx.shadowBlur=30;
+    cx.fillStyle='rgba(255,255,255,0.95)';cx.fillText('SCAN HERE',W/2,scanY);
+    cx.shadowColor='rgba(0,150,255,1)';cx.shadowBlur=50;
+    cx.fillStyle='#ffffff';cx.fillText('SCAN HERE',W/2,scanY);
     cx.restore();
 
     // FOR ABSEN
+    const faY=scanY+20;
     cx.save();cx.textAlign='center';
-    cx.fillStyle='rgba(180,210,255,0.85)';
-    cx.font='600 16px Poppins,Arial,sans-serif';
-    cx.letterSpacing='4px';
-    cx.fillText('FOR ABSEN',midX,H/2+28);
-    cx.restore();
+    cx.fillStyle='rgba(160,200,255,0.82)';
+    cx.font='600 12px Poppins,Arial,sans-serif';
+    cx.fillText('FOR ABSEN',W/2,faY);cx.restore();
 
-    // Garis horizontal pemisah kanan
-    cx.save();cx.strokeStyle='rgba(80,120,255,0.4)';cx.lineWidth=1;
-    cx.beginPath();cx.moveTo(W*0.62,H*0.2);cx.lineTo(W*0.62,H*0.8);cx.stroke();
-    cx.restore();
-
-    // ── Kanan: QR code + nama siswa ──────────────────────────────────
-    const qrArea=W*0.62+16;
-    const qrSz=Math.min(H-60,W-qrArea-20);// max QR size
-    const qrX=qrArea+(W-qrArea-qrSz)/2;
-    const qrY2=(H-qrSz)/2;
-
-    // QR white bg
-    cx.fillStyle='#ffffff';
-    const qrPad=6;
-    cx.save();
-    if(cx.roundRect)cx.roundRect(qrX-qrPad,qrY2-qrPad,qrSz+qrPad*2,qrSz+qrPad*2,6);
-    else cx.rect(qrX-qrPad,qrY2-qrPad,qrSz+qrPad*2,qrSz+qrPad*2);
-    // QR glow
-    cx.shadowColor='rgba(80,160,255,0.5)';cx.shadowBlur=16;
-    cx.fill();cx.restore();
-
-    // Nama siswa bawah QR (dalam strip)
-    const nameY=qrY2+qrSz+qrPad+14;
-    cx.fillStyle='rgba(255,255,255,0.92)';
-    cx.font='bold 13px Poppins,Arial,sans-serif';
-    cx.textAlign='center';
-    const nameX=qrX+qrSz/2;
-    let dn=nama;
-    while(cx.measureText(dn).width>qrSz+qrPad*2&&dn.length>4)dn=dn.slice(0,-1);
-    if(dn!==nama)dn=dn.trim()+'…';
-    cx.fillText(dn,nameX,nameY>H-8?H-8:nameY);
-    if(kelasNama&&nameY+14<=H-4){
-      cx.fillStyle='rgba(140,180,255,0.8)';
-      cx.font='600 11px Poppins,Arial,sans-serif';
-      cx.fillText(kelasNama,nameX,nameY+14);
+    // ── Kartu putih (QR area) ─────────────────────────────────────
+    const bx=16,bw=W-32,by=faY+12;
+    const qsz=bw-32,qx=bx+16,qy=by+14;
+    const niY=qy+qsz+16,ciY=niY+16;
+    const bh=(kelasNama?ciY+14:niY+10)-by;
+    const br=12;
+    function rrect(x,y,w,h,r){
+      cx.beginPath();
+      if(cx.roundRect)cx.roundRect(x,y,w,h,r);
+      else{cx.moveTo(x+r,y);cx.lineTo(x+w-r,y);cx.arcTo(x+w,y,x+w,y+r,r);cx.lineTo(x+w,y+h-r);cx.arcTo(x+w,y+h,x+w-r,y+h,r);cx.lineTo(x+r,y+h);cx.arcTo(x,y+h,x,y+h-r,r);cx.lineTo(x,y+r);cx.arcTo(x,y,x+r,y,r);cx.closePath();}
     }
+    // Shadow
+    cx.save();cx.shadowColor='rgba(0,0,50,0.6)';cx.shadowBlur=20;cx.shadowOffsetY=6;
+    cx.fillStyle='#ffffff';rrect(bx,by,bw,bh,br);cx.fill();cx.restore();
+    // Border
+    cx.save();cx.strokeStyle='rgba(0,0,30,0.85)';cx.lineWidth=5;rrect(bx,by,bw,bh,br);cx.stroke();cx.restore();
+    // Outer glow ring
+    cx.save();cx.shadowColor='rgba(80,130,255,0.4)';cx.shadowBlur=12;
+    cx.strokeStyle='rgba(80,130,255,0.18)';cx.lineWidth=1;rrect(bx-2,by-2,bw+4,bh+4,br+2);cx.stroke();cx.restore();
+    // Corner brackets
+    const bp=10,bl=22,bww=2.5;
+    const x1=bx+bp,y1=by+bp,x2=bx+bw-bp,y2=by+bh-bp;
+    cx.strokeStyle='#2255cc';cx.lineWidth=bww;cx.lineCap='square';
+    [[x1,y1+bl,x1,y1,x1+bl,y1],[x2-bl,y1,x2,y1,x2,y1+bl],
+     [x1,y2-bl,x1,y2,x1+bl,y2],[x2-bl,y2,x2,y2,x2,y2-bl]].forEach(([ax,ay,bxx,byy,ex,ey])=>{
+      cx.beginPath();cx.moveTo(ax,ay);cx.lineTo(bxx,byy);cx.lineTo(ex,ey);cx.stroke();
+    });
 
-    // Watermark bawah
-    cx.fillStyle='rgba(255,255,255,0.18)';
-    cx.font='9px Arial,sans-serif';cx.textAlign='left';
-    cx.fillText('By-Kali-Linux-Arya  |  SMP Sains Lombok Islamic School',14,H-8);
+    // QR code area
+    cx.fillStyle='#ffffff';cx.fillRect(qx-1,qy-1,qsz+2,qsz+2);
+    cx.imageSmoothingEnabled=false;
 
-    // ── Draw QR + load logo async ─────────────────────────────────────
-    function drawQRAndLogo(){
-      cx.imageSmoothingEnabled=false;
-      if(qrEl.tagName==='CANVAS')cx.drawImage(qrEl,qrX,qrY2,qrSz,qrSz);
-      else{const qi=new Image();qi.onload=()=>{cx.imageSmoothingEnabled=false;cx.drawImage(qi,qrX,qrY2,qrSz,qrSz);};qi.src=qrEl.src;}
+    function afterQR(){
+      // Nama siswa
+      cx.textAlign='center';cx.fillStyle='#0d0d22';
+      cx.font='bold 14px Poppins,Arial,sans-serif';
+      let dn=nama;while(cx.measureText(dn).width>bw-16&&dn.length>4)dn=dn.slice(0,-1);
+      if(dn!==nama)dn=dn.trim()+'…';
+      cx.fillText(dn,W/2,niY);
+      if(kelasNama){
+        cx.fillStyle='#1a3fb4';cx.font='600 11px Poppins,Arial,sans-serif';
+        cx.fillText(kelasNama,W/2,ciY);
+      }
 
-      // Logo SMP async
+      // ── THANK YOU ────────────────────────────────────────────────
+      const tyY=by+bh+32;
+      cx.save();cx.textAlign='center';
+      cx.font='800 28px Poppins,"Arial Black",Arial,sans-serif';
+      cx.shadowColor='rgba(0,200,255,0.8)';cx.shadowBlur=25;
+      cx.fillStyle='rgba(255,255,255,0.95)';cx.fillText('THANK YOU',W/2,tyY);
+      cx.shadowColor='rgba(0,150,255,1)';cx.shadowBlur=40;
+      cx.fillStyle='#ffffff';cx.fillText('THANK YOU',W/2,tyY);
+      cx.restore();
+
+      // Watermark
+      cx.fillStyle='rgba(0,0,30,0.3)';cx.fillRect(0,H-16,W,16);
+      cx.fillStyle='rgba(160,190,255,0.50)';
+      cx.font='6.5px Arial,sans-serif';cx.textAlign='center';
+      cx.fillText('By-Kali-Linux-Arya  |  SMP Sains Lombok Islamic School',W/2,H-5);
+
+      // Logo async
       const logoImg=new Image();
       logoImg.onload=function(){
         cx.save();
-        cx.beginPath();cx.arc(logoPad+logoSz/2,H/2,logoSz/2,0,Math.PI*2);
-        cx.fillStyle='rgba(255,255,255,0.06)';cx.fill();
-        cx.clip();cx.drawImage(logoImg,logoPad,H/2-logoSz/2,logoSz,logoSz);
-        cx.restore();
+        cx.beginPath();cx.arc(W/2,ly+lsz/2,lsz/2,0,Math.PI*2);
+        cx.fillStyle='rgba(10,10,40,0.2)';cx.fill();cx.clip();
+        cx.drawImage(logoImg,lx,ly,lsz,lsz);cx.restore();
         try{callback(canvas.toDataURL('image/png'));}catch(e){callback(null);}
       };
-      logoImg.onerror=function(){
-        // Fallback: ikon sekolah sederhana
-        cx.save();cx.textAlign='center';
-        cx.fillStyle='rgba(255,255,255,0.25)';cx.font='bold 22px Arial';
-        cx.fillText('🏫',logoPad+logoSz/2,H/2+8);
-        cx.restore();
-        try{callback(canvas.toDataURL('image/png'));}catch(e){callback(null);}
-      };
+      logoImg.onerror=function(){try{callback(canvas.toDataURL('image/png'));}catch(e){callback(null);}};
       logoImg.src='smp-sains-lis.png';
     }
-    drawQRAndLogo();
+
+    if(qrEl.tagName==='CANVAS'){cx.drawImage(qrEl,qx,qy,qsz,qsz);afterQR();}
+    else{const qi=new Image();qi.onload=()=>{cx.imageSmoothingEnabled=false;cx.drawImage(qi,qx,qy,qsz,qsz);afterQR();};qi.onerror=()=>afterQR();qi.src=qrEl.src;}
   }
 
   function showPrint(){
@@ -1439,20 +1455,50 @@ window.exportExcel=function(){
     ['Dicetak:',new Date().toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'})],
     [],
   ];
-  const ws=XLSX.utils.aoa_to_sheet(infoRows);
-  // Data rows
-  let dataRows;
+  // Keterangan
+  const infoRows2=[...infoRows];
+  if(!isHarian)infoRows2.push(['Keterangan:','H=Hadir, T=Terlambat, A=Alfa, I=Izin, S=Sakit, Lb=Libur, —=Tidak ada data'],[]);
+
+  const ws=XLSX.utils.aoa_to_sheet(isHarian?infoRows:infoRows2);
+  let colWidths;
+
   if(isHarian){
-    dataRows=rekapData.map(d=>({'No':d.no,'Nama':d.nama,'Kelas':d.kelas,'Sesi':d.sesi||'masuk','Jam Absen':d.jam,'Status':d.status,'Tanggal':tgl}));
+    const dataRows=rekapData.map(d=>({'No':d.no,'Nama':d.nama,'Kelas':d.kelas,'Tanggal':tgl,'Sesi':d.sesi||'masuk','Jam Absen':d.jam,'Status':d.status}));
+    XLSX.utils.sheet_add_json(ws,dataRows,{origin:-1,skipHeader:false});
+    colWidths=[{wch:5},{wch:28},{wch:14},{wch:14},{wch:10},{wch:12},{wch:14}];
   } else {
-    dataRows=rekapData.map(d=>({'No':d.no,'Nama':d.nama,'Kelas':d.kelas,'Hadir':d.h,'Terlambat':d.t,'Alfa':d.a,'Izin':d.iz,'Sakit':d.sk,'Libur':d.lib,'Total Hari':d.total,'% Kehadiran':d.pct+'%','Periode':periodeLabel}));
+    // Kolom per tanggal
+    const dates=window._rekapDates||[];
+    function fmtTglXL(t){const d=new Date(t);return d.getDate()+'/'+(d.getMonth()+1);}
+    // Build header row sebagai array
+    const hdr=['No','Nama','Kelas',...dates.map(fmtTglXL),'H','T','A','I','S','Libur','Total','%'];
+    // Data rows sebagai array (untuk kontrol penuh)
+    const dataAoa=[hdr];
+    rekapData.forEach(d=>{
+      const row=[d.no,d.nama,d.kelas];
+      dates.forEach(t=>row.push(d.detail?.[t]||'—'));
+      row.push(d.h,d.t,d.a,d.iz,d.sk,d.lib||0,d.total,d.pct+'%');
+      dataAoa.push(row);
+    });
+    XLSX.utils.sheet_add_aoa(ws,dataAoa,{origin:-1});
+    colWidths=[{wch:5},{wch:28},{wch:14},...dates.map(()=>({wch:8})),
+      {wch:5},{wch:5},{wch:5},{wch:5},{wch:5},{wch:6},{wch:7},{wch:7}];
+
+    // Style header baris data (baris setelah infoRows2)
+    const headerRowIdx=infoRows2.length; // 0-indexed row in sheet
+    const range=XLSX.utils.decode_range(ws['!ref']||'A1');
+    for(let col=range.s.c;col<=range.e.c;col++){
+      const addr=XLSX.utils.encode_cell({r:headerRowIdx,c:col});
+      if(!ws[addr])continue;
+      if(!ws[addr].s)ws[addr].s={};
+      ws[addr].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1A3A8A'}},alignment:{horizontal:'center'}};
+    }
   }
-  XLSX.utils.sheet_add_json(ws,dataRows,{origin:-1,skipHeader:false});
-  // Style kolom lebar
-  ws['!cols']=[{wch:5},{wch:28},{wch:14},{wch:12},{wch:12},{wch:14},{wch:22}];
+
+  ws['!cols']=colWidths;
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Rekap Absen');
-  XLSX.writeFile(wb,`Rekap_Absen_${periodeLabel.replace(/[/:]/g,'-')}.xlsx`);
+  XLSX.writeFile(wb,`Rekap_Absen_${periodeLabel.replace(/[^a-zA-Z0-9_]/g,'-')}.xlsx`);
 };
 window.exportPDF=function(){
   if(!rekapData.length){alert('Tidak ada data');return;}
