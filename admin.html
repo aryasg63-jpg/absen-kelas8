@@ -353,7 +353,7 @@ if('serviceWorker' in navigator){
 
 <!-- MODAL TAMBAH ABSEN HARI LALU -->
 <div class="modal-bg" id="modal-tambah-absen">
-  <div class="modal">
+  <div class="modal" style="max-width:520px">
     <h3>Tambah Absen Hari Lalu</h3>
     <div id="alert-tambah-absen" class="alert"></div>
     <div class="frow">
@@ -361,16 +361,27 @@ if('serviceWorker' in navigator){
       <div><label>Tanggal</label><input type="date" class="inp" id="tambah-tgl"></div>
     </div>
     <div class="frow">
-      <div><label>Nama Siswa</label><select class="inp" id="tambah-nama"><option value="">-- Pilih Siswa --</option></select></div>
       <div><label>Jam Absen</label><input type="time" class="inp" id="tambah-jam"></div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div><label>Status</label><select class="inp" id="tambah-status"><option>Hadir</option><option>Terlambat</option><option>Alfa</option><option>Izin</option><option>Sakit</option><option>Bolos</option></select></div>
+        <div><label>Sesi</label><select class="inp" id="tambah-sesi"><option value="masuk">Masuk</option><option value="pulang">Pulang</option></select></div>
+      </div>
     </div>
-    <div class="frow">
-      <div><label>Status</label><select class="inp" id="tambah-status"><option>Hadir</option><option>Terlambat</option><option>Alfa</option><option>Izin</option><option>Sakit</option><option>Bolos</option></select></div>
-      <div><label>Sesi</label><select class="inp" id="tambah-sesi"><option value="masuk">Masuk</option><option value="pulang">Pulang</option></select></div>
+    <div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span>Pilih Siswa <span id="lbl-selected">(0 dipilih)</span></span>
+        <span style="display:flex;gap:6px">
+          <button type="button" class="btn btn-sm" onclick="pilihSemuaSiswa(true)" style="font-size:11px;padding:3px 10px">✅ Semua</button>
+          <button type="button" class="btn btn-sm" onclick="pilihSemuaSiswa(false)" style="font-size:11px;padding:3px 10px">✕ Reset</button>
+        </span>
+      </div>
+      <div id="tambah-siswa-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r);padding:6px;display:grid;grid-template-columns:1fr 1fr;gap:4px">
+        <p style="color:var(--hint);font-size:12px;grid-column:span 2">Pilih kelas dulu</p>
+      </div>
     </div>
     <div class="modal-btns">
       <button class="btn" onclick="closeModal('modal-tambah-absen')">Batal</button>
-      <button class="btn btn-dark" onclick="simpanTambahAbsen()">Simpan</button>
+      <button class="btn btn-dark" onclick="simpanTambahAbsen()">💾 Simpan</button>
     </div>
   </div>
 </div>
@@ -1040,12 +1051,16 @@ window.printSemuaQR=function(){
     });
     // Hapus loading overlay
     const ol=document.getElementById('print-load-overlay');if(ol)ol.remove();
-    // Hapus inline display style agar @media print { display:grid!important } bekerja
-    area.removeAttribute('style');
+    // Sembunyikan dulu dengan visibility agar tidak block click,
+    // tapi tetap ada di DOM untuk @media print
+    area.style.cssText='visibility:hidden;position:fixed;inset:0;';
     // Beri waktu browser render sebelum print
     setTimeout(()=>{
+      // Hapus style sesaat sebelum print agar @media print grid bekerja
+      area.style.cssText='';
       window.print();
-      setTimeout(()=>{area.innerHTML='';area.style.display='none';},300);
+      // Setelah print, sembunyikan kembali dengan display:none
+      setTimeout(()=>{area.innerHTML='';area.style.display='none';},500);
     },800);
   }
 };
@@ -1663,24 +1678,33 @@ window.exportPDF=function(){
   const w=window.open('','_blank');if(!w){alert('Izinkan popup di browser');return;}w.document.write(html);w.document.close();setTimeout(()=>w.print(),500);
 };
 
-window.loadEditData=async function(){
+// Cache: { tgl: { ts: timestamp, data: [] } }
+let _editCache={},_editLastTgl='';
+window.loadEditData=async function(forceRefresh=false){
   const tgl=document.getElementById('edit-tgl').value||todayStr(),kelasId=document.getElementById('edit-kelas').value;
   editDataAll=[];
-  try{
-    const snap=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));
-    snap.forEach(d=>{
-      const dd=d.data();
-      // Enrich kelasNama from siswaList if missing
-      if(!dd.kelasNama||dd.kelasNama==='-'){
-        const sw=siswaList.find(s=>s.nama===dd.nama);
-        if(sw)dd.kelasNama=sw.kelasNama;
-      }
-      editDataAll.push({id:d.id,...dd});
-    });
-    localStorage.setItem('adm_cache_absen_'+tgl,JSON.stringify(editDataAll));
-  }catch(e){
-    const c=localStorage.getItem('adm_cache_absen_'+tgl);
-    if(c)editDataAll=JSON.parse(c);
+  // Gunakan cache jika tanggal sama dan tidak force refresh (max 60 detik)
+  const now=Date.now();
+  if(!forceRefresh&&_editLastTgl===tgl&&_editCache[tgl]&&(now-_editCache[tgl].ts)<60000){
+    editDataAll=[..._editCache[tgl].data];
+  } else {
+    try{
+      const snap=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));
+      snap.forEach(d=>{
+        const dd=d.data();
+        if(!dd.kelasNama||dd.kelasNama==='-'){
+          const sw=siswaList.find(s=>s.nama===dd.nama);
+          if(sw)dd.kelasNama=sw.kelasNama;
+        }
+        editDataAll.push({id:d.id,...dd});
+      });
+      _editCache[tgl]={ts:now,data:[...editDataAll]};
+      _editLastTgl=tgl;
+      localStorage.setItem('adm_cache_absen_'+tgl,JSON.stringify(editDataAll));
+    }catch(e){
+      const cached=localStorage.getItem('adm_cache_absen_'+tgl);
+      if(cached)editDataAll=JSON.parse(cached);
+    }
   }
   if(kelasId)editDataAll=editDataAll.filter(d=>d.kelasId===kelasId||siswaList.find(s=>s.nama===d.nama&&s.kelasId===kelasId));
   editDataAll.sort((a,b)=>a.nama.localeCompare(b.nama));
@@ -1699,38 +1723,72 @@ window.toggleLiburEdit=function(){
 };
 window.openTambahAbsenLalu=function(){
   const opts=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
-  document.getElementById('tambah-kelas').innerHTML='<option value="">-- Pilih Kelas --</option>'+opts;
+  const sel=document.getElementById('tambah-kelas');
+  sel.innerHTML='<option value="">-- Semua Kelas --</option>'+opts;
+  sel.value=''; // reset ke semua kelas
   const tgl=document.getElementById('edit-tgl').value||todayStr();
   document.getElementById('tambah-tgl').value=tgl;
   document.getElementById('tambah-tgl').max=todayStr();
-  document.getElementById('tambah-nama').innerHTML='<option value="">-- Pilih Siswa --</option>';
   document.getElementById('modal-tambah-absen').classList.add('open');
+  // Tampilkan semua siswa langsung (kelas="" → semua)
+  populateTambahSiswa();
 };
 window.populateTambahSiswa=function(){
   const kelasId=document.getElementById('tambah-kelas').value;
-  const filtered=(kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList).sort((a,b)=>a.nama.localeCompare(b.nama,'id'));
-  const sel=document.getElementById('tambah-nama');
-  sel.innerHTML='<option value="">-- Pilih Siswa --</option>';
-  filtered.forEach(s=>{const o=document.createElement('option');o.textContent=s.nama;o.value=s.nama;sel.appendChild(o);});
+  const filtered=(kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList)
+    .sort((a,b)=>a.nama.localeCompare(b.nama,'id'));
+  const box=document.getElementById('tambah-siswa-list');
+  if(!filtered.length){
+    box.innerHTML='<p style="color:var(--hint);font-size:12px;grid-column:span 2">'+(siswaList.length?'Tidak ada siswa di kelas ini':'Data siswa belum dimuat')+'</p>';
+    updateLabelSelected();return;
+  }
+  box.innerHTML=filtered.map(s=>`
+    <label style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;border:1px solid var(--border);background:var(--gray);transition:background .1s"
+      onmouseenter="this.style.background='var(--surface)'" onmouseleave="this.style.background='var(--gray)'">
+      <input type="checkbox" class="cb-siswa" value="${s.nama}" onchange="updateLabelSelected()"
+        style="width:14px;height:14px;accent-color:var(--blue);flex-shrink:0">
+      <span style="line-height:1.3">${s.nama}</span>
+    </label>`).join('');
+  updateLabelSelected();
+};
+window.pilihSemuaSiswa=function(val){
+  document.querySelectorAll('.cb-siswa').forEach(cb=>cb.checked=val);
+  updateLabelSelected();
+};
+window.updateLabelSelected=function(){
+  const n=document.querySelectorAll('.cb-siswa:checked').length;
+  const lbl=document.getElementById('lbl-selected');
+  if(lbl)lbl.textContent=n?`(${n} dipilih)`:'(0 dipilih)';
 };
 window.simpanTambahAbsen=async function(){
-  const nama=document.getElementById('tambah-nama').value;
   const tgl=document.getElementById('tambah-tgl').value;
   const jam=document.getElementById('tambah-jam').value;
   const status=document.getElementById('tambah-status').value;
   const sesi=document.getElementById('tambah-sesi').value;
   const kelasId=document.getElementById('tambah-kelas').value;
   const box=document.getElementById('alert-tambah-absen');
-  if(!nama||!tgl||!kelasId){showAlert(box,'Pilih kelas, siswa, dan tanggal','err');return;}
-  const sw=siswaList.find(s=>s.nama===nama);
-  const kelasNama=sw?.kelasNama||kelasList.find(k=>k.id===kelasId)?.nama||'';
-  await addDoc(collection(db,'absensi'),{
-    nama,kelasId:sw?.kelasId||kelasId,kelasNama,tanggal:tgl,
-    jamStr:jam||'-',status,sesi,
-    waktu:Timestamp.fromDate(new Date(tgl+'T'+(jam||'00:00')+':00'))
-  });
-  showAlert(box,`Absen ${nama} pada ${tgl} disimpan`,'ok');
-  setTimeout(()=>{closeModal('modal-tambah-absen');loadEditData();},1200);
+  // Kumpulkan semua siswa yang tercentang
+  const checked=[...document.querySelectorAll('.cb-siswa:checked')].map(cb=>cb.value);
+  if(!tgl){showAlert(box,'Pilih tanggal','err');return;}
+  if(!checked.length){showAlert(box,'Pilih minimal 1 siswa','err');return;}
+  const kelasNamaDefault=kelasId?kelasList.find(k=>k.id===kelasId)?.nama||'':'';
+  showAlert(box,`⏳ Menyimpan ${checked.length} absen...`,'ok');
+  let berhasil=0,gagal=0;
+  for(const nama of checked){
+    try{
+      const sw=siswaList.find(s=>s.nama===nama);
+      const kelasNama=sw?.kelasNama||kelasNamaDefault;
+      const kelasIdFinal=sw?.kelasId||kelasId;
+      await addDoc(collection(db,'absensi'),{
+        nama,kelasId:kelasIdFinal,kelasNama,tanggal:tgl,
+        jamStr:jam||'-',status,sesi,
+        waktu:Timestamp.fromDate(new Date(tgl+'T'+(jam||'00:00')+':00'))
+      });
+      berhasil++;
+    }catch(e){gagal++;}
+  }
+  showAlert(box,`✅ ${berhasil} absen disimpan${gagal?', '+gagal+' gagal':''}`,'ok');
+  setTimeout(()=>{closeModal('modal-tambah-absen');const t3=document.getElementById('edit-tgl').value||todayStr();delete _editCache[t3];loadEditData(true);},1400);
 };
 function getKelasNamaFromData(d){
   if(d.kelasNama && d.kelasNama!=='-' && d.kelasNama!=='undefined') return d.kelasNama;
@@ -1793,9 +1851,9 @@ window.simpanEdit=async function(){
     tanggal:document.getElementById('edit-tanggal-val').value,
     jenis:document.getElementById('edit-sesi-val').value
   });
-  closeModal('modal-edit');loadEditData();
+  closeModal('modal-edit');const t2=document.getElementById('edit-tgl').value||todayStr();delete _editCache[t2];loadEditData(true);
 };
-window.hapusAbsen=async function(id){if(!confirm('Hapus data absen ini?'))return;await deleteDoc(doc(db,'absensi',id));loadEditData();};
+window.hapusAbsen=async function(id){if(!confirm('Hapus data absen ini?'))return;await deleteDoc(doc(db,'absensi',id));const t=document.getElementById('edit-tgl').value||todayStr();delete _editCache[t];loadEditData(true);};
 
 window.populateSiswaSelect=function(){
   const kelasId=document.getElementById('iz-kelas').value;
