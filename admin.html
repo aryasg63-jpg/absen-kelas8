@@ -363,8 +363,8 @@ if('serviceWorker' in navigator){
     <div class="frow">
       <div><label>Jam Absen</label><input type="time" class="inp" id="tambah-jam"></div>
       <div style="display:flex;flex-direction:column;gap:4px">
-        <div><label>Status</label><select class="inp" id="tambah-status"><option>Hadir</option><option>Terlambat</option><option>Alfa</option><option>Izin</option><option>Sakit</option><option>Bolos</option></select></div>
-        <div><label>Sesi</label><select class="inp" id="tambah-sesi"><option value="masuk">Masuk</option><option value="pulang">Pulang</option></select></div>
+        <div><label>Status</label><select class="inp" id="tambah-status"><option value="Hadir">Hadir</option><option value="Terlambat">Terlambat</option><option value="Pulang">Pulang</option><option value="Alfa">Alfa</option><option value="Izin">Izin</option><option value="Sakit">Sakit</option><option value="Bolos">Bolos</option></select></div>
+        <div><label>Sesi</label><select class="inp" id="tambah-sesi" onchange="autoStatusBySesi()"><option value="masuk">Masuk</option><option value="pulang">Pulang</option></select></div>
       </div>
     </div>
     <div>
@@ -479,6 +479,15 @@ window.toggleLibur=async function(tgl){
 };
 loadLibur();
 
+// Bersihkan cache absen lama yang mungkin pakai format lama (flat, bukan nested)
+(function cleanOldCache(){
+  try{
+    const keys=Object.keys(localStorage).filter(k=>k.startsWith('adm_cache_absen_'));
+    // Cache lama punya array of objects langsung; cache baru punya array dari flatten dual-key
+    // Tidak ada cara bedakan, tapi loadRekapHarian sudah handle flat array
+    // Yang perlu dibersihkan: _editCache in-memory sudah otomatis reset saat reload
+  }catch(e){}
+})();
 window.toggleDark=function(){const d=document.documentElement.classList.toggle('dark');localStorage.setItem('dark',d?'1':'0');document.getElementById('dark-toggle').textContent=d?'☀️':'🌙';};
 if(localStorage.getItem('dark')==='1'){document.documentElement.classList.add('dark');document.getElementById('dark-toggle').textContent='☀️';}
 function updateClock(){const n=new Date();document.getElementById('jam').textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;}
@@ -1354,23 +1363,44 @@ async function loadRekapHarian(kelasId){
   const am={};const im={};
   try{
     const as=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));
-    as.forEach(d=>am[d.data().nama]={...d.data(),id:d.id});
-    localStorage.setItem('adm_cache_absen_'+tgl,JSON.stringify(Object.values(am)));
+    as.forEach(d=>{
+      const dd={...d.data(),id:d.id};
+      if(!am[dd.nama])am[dd.nama]={};
+      const sesiKey=dd.sesi||'masuk';
+      am[dd.nama][sesiKey]=dd;
+    });
+    // Cache: flatten untuk localStorage
+    const flatAm=[];Object.values(am).forEach(v=>Object.values(v).forEach(d=>flatAm.push(d)));
+    localStorage.setItem('adm_cache_absen_'+tgl,JSON.stringify(flatAm));
     const isSnap=await getDocs(collection(db,'izin'));
     const izinAll=[];isSnap.forEach(d=>izinAll.push(d.data()));
     localStorage.setItem('adm_cache_izin',JSON.stringify(izinAll));
     izinAll.forEach(dd=>{if(dd.tgl1<=tgl&&tgl<=dd.tgl2)im[dd.nama]=dd;});
   }catch(e){
     const ca=localStorage.getItem('adm_cache_absen_'+tgl);
-    if(ca)JSON.parse(ca).forEach(d=>am[d.nama]=d);
+    if(ca)JSON.parse(ca).forEach(d=>{
+      if(!am[d.nama])am[d.nama]={};
+      am[d.nama][d.sesi||'masuk']=d;
+    });
     const ci=localStorage.getItem('adm_cache_izin');
     if(ci)JSON.parse(ci).forEach(dd=>{if(dd.tgl1<=tgl&&tgl<=dd.tgl2)im[dd.nama]=dd;});
   }
-  try{const localKey='absen_local_'+tgl;const localData=localStorage.getItem(localKey);if(localData)JSON.parse(localData).forEach(d=>{if(!am[d.nama])am[d.nama]={...d,_pending:true};});}catch(e){}
+  try{const localKey='absen_local_'+tgl;const localData=localStorage.getItem(localKey);if(localData)JSON.parse(localData).forEach(d=>{if(!am[d.nama])am[d.nama]={};const sk=d.sesi||'masuk';if(!am[d.nama][sk])am[d.nama][sk]={...d,_pending:true};});}catch(e){}
   let h=0,i=0,s=0,a=0;
   rekapData=targets.map((sw,idx)=>{
-    const iz=im[sw.nama],ab=am[sw.nama];let st=isLibur?'Libur':'Belum absen',jam='-',sesi='-';
-    if(iz){st=iz.jenis;iz.jenis==='Izin'?i++:s++;}else if(ab){jam=ab.jamStr;st=ab.status;sesi=ab.sesi||'masuk';st==='Alfa'?a++:h++;}else if(isLibur){/* libur */}
+    const iz=im[sw.nama],abBoth=am[sw.nama];
+    // Ambil data masuk untuk status hadir, pulang untuk konfirmasi
+    const ab=abBoth?.masuk||abBoth?.pulang||null;
+    const abPulang=abBoth?.pulang||null;
+    let st=isLibur?'Libur':'Belum absen',jam='-',sesi='-';
+    if(iz){st=iz.jenis;iz.jenis==='Izin'?i++:s++;}else if(ab){
+      jam=ab.jamStr;st=ab.status;sesi=ab.sesi||'masuk';
+      // Hanya hitung HADIR untuk sesi masuk
+      if(st==='Hadir')h++;
+      else if(st==='Terlambat')h++;
+      else if(st==='Alfa')a++;
+      // Pulang dan Bolos tidak dihitung hadir
+    }else if(isLibur){/* libur */}
     return{no:idx+1,nama:sw.nama,kelas:sw.kelasNama||'-',jam,status:st,sesi,isLibur};
   });
   document.getElementById('cnt-h').textContent=h;document.getElementById('cnt-i').textContent=i;
@@ -1402,7 +1432,10 @@ async function loadRekapRange(kelasId,rangeType){
       const dd=d.data();
       if(dates.includes(dd.tanggal)){
         if(!allAm[dd.nama])allAm[dd.nama]={};
-        if(!allAm[dd.nama][dd.tanggal]||dd.sesi!=='pulang')allAm[dd.nama][dd.tanggal]={...dd,id:d.id};
+        // Simpan keduanya: masuk dan pulang terpisah
+        const sesiKey=dd.sesi||'masuk';
+        if(!allAm[dd.nama][dd.tanggal])allAm[dd.nama][dd.tanggal]={};
+        allAm[dd.nama][dd.tanggal][sesiKey]={...dd,id:d.id};
       }
     });
   }catch(e){}
@@ -1431,10 +1464,15 @@ async function loadRekapRange(kelasId,rangeType){
         izinEntry.jenis==='Izin'?iz++:sk++;
         detail[tgl]=jn;return;
       }
-      const ab=allAm[sw.nama]?.[tgl];
+      const abAll=allAm[sw.nama]?.[tgl];
+      // Ambil record masuk untuk status hadir; fallback ke pulang
+      const ab=abAll?.masuk||abAll?.pulang||null;
       if(!ab){a++;detail[tgl]='Alfa';return;}
-      if(ab.status==='Hadir'){h++;detail[tgl]='Hadir';}
-      else if(ab.status==='Terlambat'){h++;t++;detail[tgl]='Terlambat';}
+      const isMasukSesi=(ab.sesi||'masuk')!=='pulang';
+      if(ab.status==='Hadir'&&isMasukSesi){h++;detail[tgl]='Hadir';}
+      else if(ab.status==='Terlambat'&&isMasukSesi){h++;t++;detail[tgl]='Terlambat';}
+      else if(ab.status==='Pulang'||(!isMasukSesi&&ab.status==='Hadir')){detail[tgl]='Pulang';/* tidak dihitung hadir */}
+      else if(ab.status==='Bolos'){detail[tgl]='Bolos';/* tidak dihitung hadir */}
       else if(ab.status==='Alfa'){a++;detail[tgl]='Alfa';}
       else if(ab.status==='Izin'){iz++;detail[tgl]='Izin';}
       else if(ab.status==='Sakit'){sk++;detail[tgl]='Sakit';}
@@ -1755,6 +1793,12 @@ window.pilihSemuaSiswa=function(val){
   document.querySelectorAll('.cb-siswa').forEach(cb=>cb.checked=val);
   updateLabelSelected();
 };
+window.autoStatusBySesi=function(){
+  const sesi=document.getElementById('tambah-sesi').value;
+  const statusEl=document.getElementById('tambah-status');
+  if(sesi==='pulang')statusEl.value='Pulang';
+  else if(statusEl.value==='Pulang')statusEl.value='Hadir';
+};
 window.updateLabelSelected=function(){
   const n=document.querySelectorAll('.cb-siswa:checked').length;
   const lbl=document.getElementById('lbl-selected');
@@ -1779,9 +1823,11 @@ window.simpanTambahAbsen=async function(){
       const sw=siswaList.find(s=>s.nama===nama);
       const kelasNama=sw?.kelasNama||kelasNamaDefault;
       const kelasIdFinal=sw?.kelasId||kelasId;
+      // Auto-fix: kalau status Pulang → sesi harus pulang
+      const sesiFixed=(status==='Pulang')?'pulang':sesi;
       await addDoc(collection(db,'absensi'),{
         nama,kelasId:kelasIdFinal,kelasNama,tanggal:tgl,
-        jamStr:jam||'-',status,sesi,
+        jamStr:jam||'-',status,sesi:sesiFixed,
         waktu:Timestamp.fromDate(new Date(tgl+'T'+(jam||'00:00')+':00'))
       });
       berhasil++;
@@ -1814,7 +1860,8 @@ function renderEditTable(data){
   tb.innerHTML=sorted.map(d=>{
     const kelasNama=getKelasNamaFromData(d);
     const isLibur=liburSet.has(d.tanggal||'');
-    return`<tr${isLibur?' style="background:var(--amber-bg)"':''}><td>${d.nama}</td><td>${kelasNama}</td><td>${d.jamStr||'-'}</td><td><span class="badge ${bc(d.status)}">${d.status}</span>${isLibur?' <span style="font-size:10px;color:var(--amber)">🏖️</span>':''}</td><td style="display:flex;gap:5px"><button class="btn btn-sm btn-blue" data-edit-id="${d.id}">Edit</button><button class="btn btn-sm btn-red" data-del-id="${d.id}">Hapus</button></td></tr>`;
+    const sesiLabel=d.sesi==='pulang'?' <span style="font-size:10px;opacity:.6">🏠</span>':'';
+    return`<tr${isLibur?' style="background:var(--amber-bg)"':''}><td>${d.nama}${sesiLabel}</td><td>${kelasNama}</td><td>${d.jamStr||'-'}</td><td><span class="badge ${bc(d.status)}">${d.status}</span>${isLibur?' <span style="font-size:10px;color:var(--amber)">🏖️</span>':''}</td><td style="display:flex;gap:5px"><button class="btn btn-sm btn-blue" data-edit-id="${d.id}">Edit</button><button class="btn btn-sm btn-red" data-del-id="${d.id}">Hapus</button></td></tr>`;
   }).join('');
   // Attach events safely (handles any character in nama)
   tb.querySelectorAll('[data-edit-id]').forEach(btn=>{
@@ -1911,7 +1958,7 @@ window.loadStatistik=async function(){
   function countDays(arr,jenis){return arr.filter(i=>i.jenis===jenis).reduce((acc,i)=>{const d1=new Date(i.tgl1),d2=new Date(i.tgl2);for(let d=new Date(d1);d<=d2;d.setDate(d.getDate()+1)){const ds=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;if(ds.startsWith(bulan))acc++;}return acc;},0);}
   const statData=targets.map((s,idx)=>{
     const abs=am[s.nama]||[],sil=il.filter(i=>i.nama===s.nama);
-    const h=abs.filter(a=>a.status==='Hadir'||a.status==='Terlambat').length;
+    const h=abs.filter(a=>(a.status==='Hadir'||a.status==='Terlambat')&&a.sesi!=='pulang').length;
     const a=abs.filter(a=>a.status==='Alfa').length;
     const iz=countDays(sil,'Izin'),sk=countDays(sil,'Sakit');
     const total=h+a+iz+sk||1,pct=Math.round((h/total)*100);
