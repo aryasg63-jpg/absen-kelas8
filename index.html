@@ -260,10 +260,11 @@ if('serviceWorker' in navigator){
       <canvas id="scan-canvas" style="display:none"></canvas>
       <p style="font-size:12px;color:var(--muted);margin-bottom:8px;margin-top:8px">Atau input manual (pilih kelas + nama):</p>
       <div style="margin-bottom:8px">
-        <select class="inp" id="sel-kelas-manual" style="font-size:12px;padding:7px 10px"><option value="">-- Pilih Kelas (Opsional) --</option></select>
+        <select class="inp" id="sel-kelas-manual" style="font-size:12px;padding:7px 10px" onchange="populateSiswaDatalist()"><option value="">-- Pilih Kelas (Opsional) --</option></select>
       </div>
       <div style="display:flex;gap:8px">
-        <input class="inp" id="inp-nama" placeholder="Nama siswa..." onkeydown="if(event.key==='Enter')absenManual()">
+        <input class="inp" id="inp-nama" placeholder="Nama siswa..." list="datalist-siswa" autocomplete="off" onkeydown="if(event.key==='Enter')absenManual()">
+        <datalist id="datalist-siswa"></datalist>
         <button class="btn btn-dark" onclick="absenManual()">Absen</button>
       </div>
     </div>
@@ -481,11 +482,11 @@ async function loadKelas(){
     const fetchPromise=getDocs(collection(db,'kelas'));
     const snap=await Promise.race([fetchPromise,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000))]);
     const fresh=[];snap.forEach(d=>fresh.push({id:d.id,...d.data()}));
-    if(fresh.length>0){
-      kelasList=fresh;
-      kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
-      localStorage.setItem('cache_kelas',JSON.stringify(kelasList));
-    }
+    kelasList=fresh;
+    kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
+    const kj=JSON.stringify(kelasList);
+    localStorage.setItem('cache_kelas',kj);
+    localStorage.setItem('adm_cache_kelas',kj);
   }catch(e){}
   // Setelah dapat kelas, load semua siswa dan subscribe absen
   document.getElementById('kelas-label').textContent='Absensi Harian';
@@ -520,17 +521,28 @@ async function loadSemuaSiswa(){
     const fetchP=getDocs(collection(db,'siswa'));
     const snap=await Promise.race([fetchP,new Promise((_,r)=>setTimeout(()=>r(new Error('t')),7000))]);
     const fresh=[];snap.forEach(d=>fresh.push({id:d.id,...d.data()}));
-    if(fresh.length>0){
-      siswaList=fresh;
-      localStorage.setItem('adm_cache_siswa',JSON.stringify(siswaList));
-      // Simpan per kelas juga
-      kelasList.forEach(k=>{
-        const filtered=fresh.filter(s=>s.kelasId===k.id);
-        localStorage.setItem('cache_siswa_'+k.id,JSON.stringify(filtered));
-      });
-      updateCounter();
-    }
+    // FIX: Always sync - if all siswa deleted in Firebase, clear local cache too
+    siswaList=fresh;
+    const sj=JSON.stringify(siswaList);
+    localStorage.setItem('adm_cache_siswa',sj);
+    localStorage.setItem('cache_siswa_all',sj);
+    // Simpan per kelas juga
+    kelasList.forEach(k=>{
+      const filtered=fresh.filter(s=>s.kelasId===k.id);
+      localStorage.setItem('cache_siswa_'+k.id,JSON.stringify(filtered));
+    });
+    updateCounter();
+    populateSiswaDatalist();
   }catch(e){}
+}
+
+function populateSiswaDatalist(){
+  const dl=document.getElementById('datalist-siswa');
+  if(!dl)return;
+  // Filter by selected kelas if any
+  const kelasId=document.getElementById('sel-kelas-manual')?.value||'';
+  const pool=kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList;
+  dl.innerHTML=pool.map(s=>`<option value="${s.nama}"></option>`).join('');
 }
 
 // Alias agar tidak error jika ada pemanggilan lama
@@ -706,8 +718,22 @@ function showAlert(el,msg,type){
 
 window.absenManual=function(){
   const kelasId=document.getElementById('sel-kelas-manual')?.value||'';
-  const kelasNama=kelasList.find(k=>k.id===kelasId)?.nama||'';
-  doAbsen(document.getElementById('inp-nama').value,kelasId||null,kelasNama||null);
+  const namaInput=document.getElementById('inp-nama').value.trim();
+  const box=document.getElementById('alert-box');
+  if(!namaInput){showAlert(box,'Nama tidak boleh kosong','err');return;}
+  // Guard: siswaList belum selesai load dari Firebase
+  if(!siswaList.length){
+    showAlert(box,'⏳ Data siswa masih dimuat, tunggu sebentar...','err');return;
+  }
+  // VALIDASI: hanya nama siswa terdaftar yang boleh absen via input manual
+  const pool=kelasId?siswaList.filter(s=>s.kelasId===kelasId):siswaList;
+  const match=pool.find(s=>s.nama.toLowerCase()===namaInput.toLowerCase());
+  if(!match){
+    showAlert(box,'❌ "'+namaInput+'" tidak terdaftar'+(kelasId?' di kelas ini':'')+'. Hanya nama siswa terdaftar yang bisa absen.','err');
+    document.getElementById('inp-nama').value='';
+    return;
+  }
+  doAbsen(match.nama,match.kelasId,match.kelasNama);
 };
 
 window.startCam=async function(){
@@ -761,6 +787,17 @@ function processQRResult(raw){
   }
   // Set selectedKelas dari QR jika ada
   if(kelasId){selectedKelas=kelasId;}
+  // FIX: Validate against siswaList - only registered students can absen
+  if(siswaList.length>0){
+    const sw=siswaList.find(s=>s.nama.toLowerCase()===nama.toLowerCase()&&(!kelasId||s.kelasId===kelasId));
+    if(!sw){
+      const box=document.getElementById('alert-box');
+      showAlert(box,'❌ "'+nama+'" tidak terdaftar. Gunakan QR siswa yang valid.','err');
+      flashScreen(false);playSound(false);return;
+    }
+    // Use canonical name/kelas from DB
+    nama=sw.nama;kelasId=sw.kelasId;kelasNama=sw.kelasNama;
+  }
   doAbsen(nama,kelasId,kelasNama);
 }
 

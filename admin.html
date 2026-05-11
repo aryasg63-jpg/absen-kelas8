@@ -45,6 +45,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .btn{padding:7px 14px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;white-space:nowrap}
 .btn:hover{background:var(--gray)}
 .btn-dark{background:var(--text);color:var(--bg);border-color:var(--text)}.btn-dark:hover{opacity:.85}
+.btn.active{background:var(--text);color:var(--bg);border-color:var(--text)}
 .btn-blue{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-bdr)}
 .btn-red{background:var(--red-bg);color:var(--red);border-color:var(--red-bdr)}
 .btn-green{background:var(--green-bg);color:var(--green);border-color:var(--green-bdr)}
@@ -266,6 +267,7 @@ if('serviceWorker' in navigator){
         <button class="btn btn-dark" onclick="markAlfa()">Tandai Alfa</button>
         <button class="btn btn-green" onclick="exportExcel()">Export Excel</button>
         <button class="btn btn-blue" onclick="exportPDF()">Export PDF</button>
+        <button class="btn btn-sm btn-red" onclick="hapusAbsenRekap()" title="Hapus semua absen untuk periode yang sedang ditampilkan">🗑 Hapus Absen</button>
       </div>
     </div>
     <div class="stats">
@@ -284,6 +286,17 @@ if('serviceWorker' in navigator){
         <tbody id="tbl-rekap"></tbody>
       </table></div>
     </div>
+    <!-- ABSEN PULANG SECTION -->
+    <div class="card" id="card-rekap-pulang" style="display:none">
+      <div class="tbar">
+        <h3>🏠 Absen Pulang</h3>
+        <span id="pulang-count-lbl" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th style="width:36px">No</th><th>Nama</th><th style="width:90px">Kelas</th><th style="width:75px">Jam</th><th style="width:105px">Status</th></tr></thead>
+        <tbody id="tbl-rekap-pulang"></tbody>
+      </table></div>
+    </div>
   </div>
 
   <!-- EDIT -->
@@ -298,12 +311,37 @@ if('serviceWorker' in navigator){
           <button class="btn btn-sm" id="libur-toggle-btn" onclick="toggleLiburEdit()">🏖️ Tandai Libur</button>
           <button class="btn btn-sm btn-green" onclick="openTambahAbsenLalu()">+ Tambah Absen</button>
         </div>
+
+      <!-- Tool buttons -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+        <button class="btn btn-sm btn-blue" onclick="hapusDuplikasi()" title="Hapus record duplikat (lebih dari 1 masuk/pulang per siswa per hari)">🧹 Hapus Duplikasi</button>
+        <button class="btn btn-sm" onclick="hapusGhostData()" style="background:var(--amber);color:#fff">👻 Ghost Data</button>
+        <button class="btn btn-sm btn-red" onclick="openHapusBulkModal()">🗑 Hapus Massal</button>
+      </div>
       </div>
       <div id="libur-info-bar" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:10px;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-bdr)">🏖️ Hari ini ditandai sebagai hari libur</div>
-      <div class="tbl-wrap"><table>
-        <thead><tr><th>Nama</th><th style="width:90px">Kelas</th><th style="width:85px">Jam</th><th style="width:105px">Status</th><th style="width:110px">Aksi</th></tr></thead>
-        <tbody id="tbl-edit"></tbody>
-      </table></div>
+      <!-- TABEL ABSEN MASUK -->
+      <div style="margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <h4 style="margin:0;font-size:13px;font-weight:700">↑ Absen Masuk</h4>
+          <span id="edit-masuk-count" style="font-size:11px;color:var(--muted)"></span>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Nama</th><th style="width:90px">Kelas</th><th style="width:85px">Jam</th><th style="width:105px">Status</th><th style="width:110px">Aksi</th></tr></thead>
+          <tbody id="tbl-edit-masuk"></tbody>
+        </table></div>
+      </div>
+      <!-- TABEL ABSEN PULANG -->
+      <div style="margin-top:18px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <h4 style="margin:0;font-size:13px;font-weight:700">↓ Absen Pulang</h4>
+          <span id="edit-pulang-count" style="font-size:11px;color:var(--muted)"></span>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Nama</th><th style="width:90px">Kelas</th><th style="width:85px">Jam</th><th style="width:105px">Status</th><th style="width:110px">Aksi</th></tr></thead>
+          <tbody id="tbl-edit-pulang"></tbody>
+        </table></div>
+      </div>
     </div>
   </div>
 
@@ -407,6 +445,65 @@ if('serviceWorker' in navigator){
   </div>
 </div>
 
+<!-- MODAL HAPUS BULK ABSEN -->
+<div class="modal-bg" id="modal-hapus-bulk">
+  <div class="modal" style="max-width:420px">
+    <h3>🗑 Hapus Absen Massal</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Hapus semua data absen untuk periode berikut. <b style="color:var(--red)">Tidak bisa dibatalkan!</b></p>
+    <div class="fone">
+      <label>Periode</label>
+      <select class="inp" id="bulk-del-mode" onchange="updateBulkDelLabel()">
+        <option value="harian">Harian</option>
+        <option value="mingguan">Mingguan</option>
+        <option value="bulanan">Bulanan</option>
+      </select>
+    </div>
+    <div class="fone" id="bulk-del-tgl-wrap">
+      <label>Tanggal</label>
+      <input type="date" class="inp" id="bulk-del-tgl" onchange="updateBulkDelLabel()">
+    </div>
+    <div class="fone" id="bulk-del-bulan-wrap" style="display:none">
+      <label>Bulan</label>
+      <input type="month" class="inp" id="bulk-del-bulan" onchange="updateBulkDelLabel()">
+    </div>
+    <div class="fone">
+      <label>Kelas</label>
+      <select class="inp" id="bulk-del-kelas">
+        <option value="">Semua kelas</option>
+      </select>
+    </div>
+    <div id="bulk-del-label" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-bdr);border-radius:var(--r);padding:10px 12px;font-size:12px;font-weight:600;margin-bottom:12px"></div>
+    <div id="bulk-del-progress" style="display:none;font-size:12px;font-weight:600;color:var(--blue);margin-bottom:8px"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('modal-hapus-bulk')">Batal</button>
+      <button class="btn btn-red" id="bulk-del-confirm-btn" onclick="konfirmasiBulkDelete()">🗑 Hapus Sekarang</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL EDIT KELAS -->
+<div class="modal-bg" id="modal-edit-kelas">
+  <div class="modal" style="max-width:380px">
+    <h3>✏️ Edit Kelas</h3>
+    <input type="hidden" id="edit-kelas-id">
+    <div class="fone">
+      <label>Nama Kelas Lama</label>
+      <input class="inp" id="edit-kelas-nama-lama" readonly style="background:var(--gray);color:var(--muted)">
+    </div>
+    <div class="fone">
+      <label>Nama Kelas Baru</label>
+      <input class="inp" id="edit-kelas-nama-baru" placeholder="Nama kelas baru..." onkeydown="if(event.key==='Enter')simpanEditKelas()">
+    </div>
+    <div id="alert-edit-kelas" class="alert"></div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:10px">⚠️ Semua data siswa dan absen di kelas ini akan diperbarui secara otomatis.</p>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('modal-edit-kelas')">Batal</button>
+      <button class="btn btn-blue" id="btn-simpan-edit-kelas" onclick="simpanEditKelas()">💾 Simpan</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL EDIT IZIN -->
 <div class="modal-bg" id="modal-izin">
   <div class="modal">
@@ -443,6 +540,7 @@ function todayStr(){const n=new Date();return`${n.getFullYear()}-${pad(n.getMont
 const MULAI_DATE='2026-04-01';// Tanggal sistem mulai aktif
 function nowMonth(){const n=new Date();return`${n.getFullYear()}-${pad(n.getMonth()+1)}`}
 let kelasList=[],siswaList=[],rekapData=[],editDataAll=[],liburSet=new Set();
+let _editSesiFilter='semua'; // 'semua'|'masuk'|'pulang'
 
 // ── Libur: Firestore + localStorage cache ──────────────────────────────
 async function loadLibur(){
@@ -672,17 +770,22 @@ window.sw=function(t){
 };
 
 async function loadKelas(){
-  // Load cache dulu agar langsung tampil
-  const cachedK=localStorage.getItem('adm_cache_kelas')||localStorage.getItem('cache_kelas');
-  if(cachedK){try{const c=JSON.parse(cachedK);if(c.length){kelasList=c;kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));}}catch(e){}}
+  // Always fetch from Firebase first - never pre-load potentially stale cache
+  // Cache is only used as fallback if Firebase fails (offline)
+  kelasList=[];
   try{
     const snap=await getDocs(collection(db,'kelas'));
     const fresh=[];snap.forEach(d=>fresh.push({id:d.id,...d.data()}));
-    if(fresh.length>0){
-      kelasList=fresh;kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
-      localStorage.setItem('adm_cache_kelas',JSON.stringify(kelasList));
-    }
-  }catch(e){}
+    kelasList=fresh;kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
+    // Sync ALL cache keys so both admin.html and index.html reflect deleted data
+    const kj=JSON.stringify(kelasList);
+    localStorage.setItem('adm_cache_kelas',kj);
+    localStorage.setItem('cache_kelas',kj);
+  }catch(e){
+    // Firebase offline fallback - use cache
+    const ck=localStorage.getItem('adm_cache_kelas')||localStorage.getItem('cache_kelas');
+    if(ck){try{const c=JSON.parse(ck);if(c.length){kelasList=c;kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));}}catch(x){}}
+  }
   const opts=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
   ['rek-kelas','edit-kelas','stat-kelas'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">Semua kelas</option>'+opts;});
   ['sel-kelas-siswa','iz-kelas'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">-- Pilih kelas --</option>'+opts;});
@@ -692,7 +795,15 @@ async function loadKelas(){
 function renderListKelas(){
   const el=document.getElementById('list-kelas');
   if(!kelasList.length){el.innerHTML='<p style="font-size:13px;color:var(--muted)">Belum ada kelas</p>';return;}
-  el.innerHTML=kelasList.map(k=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px;font-weight:600">${k.nama}</span><button class="btn btn-sm btn-red" onclick="hapusKelas('${k.id}','${k.nama}')">Hapus</button></div>`).join('');
+  _kelasRowMap={};
+  kelasList.forEach(k=>{_kelasRowMap[k.id]=k;});
+  el.innerHTML=kelasList.map(k=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px;font-weight:600">${k.nama}</span><div style="display:flex;gap:5px"><button class="btn btn-sm btn-blue" data-kelas-edit-id="${k.id}">Edit</button><button class="btn btn-sm btn-red" data-kelas-del-id="${k.id}" data-kelas-del-nama="${k.nama}">Hapus</button></div></div>`).join('');
+  el.querySelectorAll('[data-kelas-edit-id]').forEach(btn=>{
+    btn.onclick=()=>{const k=_kelasRowMap[btn.dataset.kelasEditId];if(k)openEditKelasModal(k);};
+  });
+  el.querySelectorAll('[data-kelas-del-id]').forEach(btn=>{
+    btn.onclick=()=>hapusKelas(btn.dataset.kelasDelId,btn.dataset.kelasDelNama);
+  });
 }
 window.tambahKelas=async function(){
   const nama=document.getElementById('inp-kelas-baru').value.trim(),box=document.getElementById('alert-kelas');
@@ -700,6 +811,8 @@ window.tambahKelas=async function(){
   if(kelasList.find(k=>k.nama.toLowerCase()===nama.toLowerCase())){showAlert(box,'Kelas sudah ada','err');return;}
   const ref=await addDoc(collection(db,'kelas'),{nama,createdAt:Timestamp.now()});
   kelasList.push({id:ref.id,nama});kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
+  // BUG FIX: Persist updated list to localStorage
+  localStorage.setItem('adm_cache_kelas',JSON.stringify(kelasList));
   document.getElementById('inp-kelas-baru').value='';
   showAlert(box,`Kelas "${nama}" ditambahkan`,'ok');
   const opts=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
@@ -711,24 +824,93 @@ window.tambahKelas=async function(){
 window.hapusKelas=async function(id,nama){
   if(!confirm(`Hapus kelas "${nama}"?`))return;
   await deleteDoc(doc(db,'kelas',id));kelasList=kelasList.filter(k=>k.id!==id);
+  // BUG FIX: Update localStorage so deleted kelas doesn't reappear on reload
+  localStorage.setItem('adm_cache_kelas',JSON.stringify(kelasList));
   const opts=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
   ['rek-kelas','edit-kelas','stat-kelas'].forEach(id2=>{const el=document.getElementById(id2);if(el)el.innerHTML='<option value="">Semua kelas</option>'+opts;});
   ['sel-kelas-siswa','iz-kelas'].forEach(id2=>{const el=document.getElementById(id2);if(el)el.innerHTML='<option value="">-- Pilih kelas --</option>'+opts;});
+  const qs=document.getElementById('sel-kelas-qr');if(qs)qs.innerHTML='<option value="">-- Semua kelas --</option>'+opts;
   renderListKelas();
 };
 
+// Open edit kelas modal
+window.openEditKelasModal=function(k){
+  document.getElementById('edit-kelas-id').value=k.id;
+  document.getElementById('edit-kelas-nama-lama').value=k.nama;
+  document.getElementById('edit-kelas-nama-baru').value=k.nama;
+  document.getElementById('alert-edit-kelas').style.display='none';
+  document.getElementById('btn-simpan-edit-kelas').disabled=false;
+  document.getElementById('modal-edit-kelas').classList.add('open');
+  setTimeout(()=>document.getElementById('edit-kelas-nama-baru').focus(),80);
+};
+
+// Simpan edit kelas — update Firestore kelas + semua siswa + semua absensi dengan kelasId ini
+window.simpanEditKelas=async function(){
+  const id=document.getElementById('edit-kelas-id').value;
+  const namaBaru=document.getElementById('edit-kelas-nama-baru').value.trim();
+  const namaLama=document.getElementById('edit-kelas-nama-lama').value;
+  const box=document.getElementById('alert-edit-kelas');
+  const btn=document.getElementById('btn-simpan-edit-kelas');
+  if(!namaBaru){showAlert(box,'Nama kelas tidak boleh kosong','err');return;}
+  if(namaBaru===namaLama){closeModal('modal-edit-kelas');return;}
+  if(kelasList.find(k=>k.id!==id&&k.nama.toLowerCase()===namaBaru.toLowerCase())){
+    showAlert(box,'Nama kelas sudah digunakan','err');return;
+  }
+  btn.disabled=true;
+  showAlert(box,'⏳ Memperbarui...','ok');
+  try{
+    // 1. Update kelas doc
+    await updateDoc(doc(db,'kelas',id),{nama:namaBaru});
+    // 2. Update semua siswa dengan kelasId ini
+    const siswaSnap=await getDocs(query(collection(db,'siswa'),where('kelasId','==',id)));
+    await Promise.all(siswaSnap.docs.map(d=>updateDoc(doc(db,'siswa',d.id),{kelasNama:namaBaru})));
+    // 3. Update semua absensi dengan kelasId ini (batch)
+    const abSnap=await getDocs(query(collection(db,'absensi'),where('kelasId','==',id)));
+    const BATCH=20;
+    const abDocs=abSnap.docs;
+    for(let i=0;i<abDocs.length;i+=BATCH){
+      await Promise.all(abDocs.slice(i,i+BATCH).map(d=>updateDoc(doc(db,'absensi',d.id),{kelasNama:namaBaru})));
+    }
+    // 4. Update memory + localStorage
+    const kelas=kelasList.find(k=>k.id===id);
+    if(kelas)kelas.nama=namaBaru;
+    kelasList.sort((a,b)=>a.nama.localeCompare(b.nama));
+    siswaList.forEach(s=>{if(s.kelasId===id)s.kelasNama=namaBaru;});
+    const kj=JSON.stringify(kelasList);
+    localStorage.setItem('adm_cache_kelas',kj);localStorage.setItem('cache_kelas',kj);
+    const sj=JSON.stringify(siswaList);
+    localStorage.setItem('adm_cache_siswa',sj);localStorage.setItem('cache_siswa_all',sj);
+    // Clear absen cache — kelasNama changed
+    Object.keys(localStorage).filter(k=>k.startsWith('adm_cache_absen_')).forEach(k=>localStorage.removeItem(k));
+    Object.keys(_editCache).forEach(k=>delete _editCache[k]);
+    // 5. Update all dropdowns
+    const opts=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
+    ['rek-kelas','edit-kelas','stat-kelas'].forEach(eid=>{const el=document.getElementById(eid);if(el)el.innerHTML='<option value="">Semua kelas</option>'+opts;});
+    ['sel-kelas-siswa','iz-kelas'].forEach(eid=>{const el=document.getElementById(eid);if(el)el.innerHTML='<option value="">-- Pilih kelas --</option>'+opts;});
+    const qs=document.getElementById('sel-kelas-qr');if(qs)qs.innerHTML='<option value="">-- Semua kelas --</option>'+opts;
+    renderListKelas();renderQRGrid();
+    closeModal('modal-edit-kelas');
+  }catch(e){
+    showAlert(box,'Error: '+e.message,'err');btn.disabled=false;
+  }
+};
+
 async function loadSiswa(){
-  // Load cache dulu
-  const cachedS=localStorage.getItem('adm_cache_siswa')||localStorage.getItem('cache_siswa_all');
-  if(cachedS){try{const c=JSON.parse(cachedS);if(c.length){siswaList=c;siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));}}catch(e){}}
+  // Always fetch from Firebase first - never pre-load potentially stale cache
+  siswaList=[];
   try{
     const snap=await getDocs(collection(db,'siswa'));
     const fresh=[];snap.forEach(d=>fresh.push({id:d.id,...d.data()}));
-    if(fresh.length>0){
-      siswaList=fresh;siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));
-      localStorage.setItem('adm_cache_siswa',JSON.stringify(siswaList));
-    }
-  }catch(e){}
+    siswaList=fresh;siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));
+    // Sync ALL cache keys so both admin.html and index.html reflect deleted data
+    const sj=JSON.stringify(siswaList);
+    localStorage.setItem('adm_cache_siswa',sj);
+    localStorage.setItem('cache_siswa_all',sj);
+  }catch(e){
+    // Firebase offline fallback - use cache
+    const cs=localStorage.getItem('adm_cache_siswa')||localStorage.getItem('cache_siswa_all');
+    if(cs){try{const c=JSON.parse(cs);if(c.length){siswaList=c;siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));}}catch(x){}}
+  }
   renderQRGrid();
 }
 window.tambahSiswa=async function(){
@@ -739,6 +921,8 @@ window.tambahSiswa=async function(){
   const kelasNama=kelasList.find(k=>k.id===kelasId)?.nama||'';
   const ref=await addDoc(collection(db,'siswa'),{nama,kelasId,kelasNama,createdAt:Timestamp.now()});
   siswaList.push({id:ref.id,nama,kelasId,kelasNama});siswaList.sort((a,b)=>a.nama.localeCompare(b.nama));
+  // BUG FIX: Persist updated list to localStorage
+  localStorage.setItem('adm_cache_siswa',JSON.stringify(siswaList));
   document.getElementById('inp-nama-siswa').value='';
   showAlert(box,`${nama} ditambahkan ke ${kelasNama}`,'ok');renderQRGrid();
 };
@@ -814,6 +998,8 @@ async function hapusSiswa(id,nama){
   if(!confirm(`Hapus "${nama}"?`))return;
   await deleteDoc(doc(db,'siswa',id));
   siswaList=siswaList.filter(s=>s.id!==id);
+  // BUG FIX: Persist updated list to localStorage so deleted siswa doesn't reappear
+  localStorage.setItem('adm_cache_siswa',JSON.stringify(siswaList));
   renderQRGrid();
 }
 window.unduhSemuaQR=function(){
@@ -1389,23 +1575,33 @@ async function loadRekapHarian(kelasId){
   let h=0,i=0,s=0,a=0;
   rekapData=targets.map((sw,idx)=>{
     const iz=im[sw.nama],abBoth=am[sw.nama];
-    // Ambil data masuk untuk status hadir, pulang untuk konfirmasi
-    const ab=abBoth?.masuk||abBoth?.pulang||null;
-    const abPulang=abBoth?.pulang||null;
+    // FIX: Only use MASUK record for main rekap table — pulang is shown separately
+    const ab=abBoth?.masuk||null;  // never fallback to pulang here
     let st=isLibur?'Libur':'Belum absen',jam='-',sesi='-';
     if(iz){st=iz.jenis;iz.jenis==='Izin'?i++:s++;}else if(ab){
       jam=ab.jamStr;st=ab.status;sesi=ab.sesi||'masuk';
-      // Hanya hitung HADIR untuk sesi masuk
       if(st==='Hadir')h++;
       else if(st==='Terlambat')h++;
       else if(st==='Alfa')a++;
-      // Pulang dan Bolos tidak dihitung hadir
     }else if(isLibur){/* libur */}
     return{no:idx+1,nama:sw.nama,kelas:sw.kelasNama||'-',jam,status:st,sesi,isLibur};
   });
   document.getElementById('cnt-h').textContent=h;document.getElementById('cnt-i').textContent=i;
   document.getElementById('cnt-s').textContent=s;document.getElementById('cnt-a').textContent=a;
   renderRekapTable(rekapData,'harian');
+  // Build & render absen pulang list
+  const pulangList=[];
+  Object.entries(am).forEach(([nama,sesiMap])=>{
+    if(sesiMap.pulang){
+      const r=sesiMap.pulang;
+      const sw=siswaList.find(s=>s.nama===nama);
+      if(!kelasId||sw?.kelasId===kelasId){
+        pulangList.push({nama,kelas:r.kelasNama||sw?.kelasNama||'-',jam:r.jamStr||'-',status:r.status||'Pulang'});
+      }
+    }
+  });
+  pulangList.sort((a,b)=>a.nama.localeCompare(b.nama,'id'));
+  renderPulangTable(pulangList);
 }
 
 async function loadRekapRange(kelasId,rangeType){
@@ -1467,7 +1663,8 @@ async function loadRekapRange(kelasId,rangeType){
       const abAll=allAm[sw.nama]?.[tgl];
       // Ambil record masuk untuk status hadir; fallback ke pulang
       const ab=abAll?.masuk||abAll?.pulang||null;
-      if(!ab){a++;detail[tgl]='Alfa';return;}
+      // BUG FIX: Don't auto-mark as Alfa. Only count Alfa from DB records (via Tandai Alfa button).
+      if(!ab){detail[tgl]='—';return;}
       const isMasukSesi=(ab.sesi||'masuk')!=='pulang';
       if(ab.status==='Hadir'&&isMasukSesi){h++;detail[tgl]='Hadir';}
       else if(ab.status==='Terlambat'&&isMasukSesi){h++;t++;detail[tgl]='Terlambat';}
@@ -1486,6 +1683,20 @@ async function loadRekapRange(kelasId,rangeType){
   document.getElementById('cnt-s').textContent=rekapData.reduce((x,d)=>x+d.sk,0);
   document.getElementById('cnt-a').textContent=rekapData.reduce((x,d)=>x+d.a,0);
   renderRekapTable(rekapData,rangeType);
+  // Build pulang list for range (semua siswa yang punya record pulang di rentang)
+  const pulangRange=[];
+  Object.entries(allAm).forEach(([nama,dateMap])=>{
+    const sw=siswaList.find(s=>s.nama===nama);
+    if(kelasId&&sw?.kelasId!==kelasId)return;
+    Object.entries(dateMap).forEach(([tgl,sesiMap])=>{
+      if(sesiMap.pulang){
+        const r=sesiMap.pulang;
+        pulangRange.push({nama,kelas:r.kelasNama||sw?.kelasNama||'-',jam:r.jamStr||'-',status:r.status||'Pulang',tgl});
+      }
+    });
+  });
+  pulangRange.sort((a,b)=>a.tgl.localeCompare(b.tgl)||a.nama.localeCompare(b.nama,'id'));
+  renderPulangTable(pulangRange,true);
 }
 function renderRekapTable(data, mode){
   const curMode = mode || (document.getElementById('rek-view-mode')?.value||'harian');
@@ -1500,6 +1711,29 @@ function renderRekapTable(data, mode){
     }
   }).join('');
 }
+function renderPulangTable(data,showDate=false){
+  const card=document.getElementById('card-rekap-pulang');
+  const lbl=document.getElementById('pulang-count-lbl');
+  const tb=document.getElementById('tbl-rekap-pulang');
+  // Update thead for range mode
+  const thead=card?.querySelector('thead tr');
+  if(thead){
+    if(showDate)thead.innerHTML='<th style="width:36px">No</th><th>Nama</th><th style="width:90px">Kelas</th><th style="width:85px">Tanggal</th><th style="width:75px">Jam</th><th style="width:105px">Status</th>';
+    else thead.innerHTML='<th style="width:36px">No</th><th>Nama</th><th style="width:90px">Kelas</th><th style="width:75px">Jam</th><th style="width:105px">Status</th>';
+  }
+  if(!data||!data.length){
+    if(card)card.style.display='none';
+    return;
+  }
+  if(card)card.style.display='block';
+  if(lbl)lbl.textContent=data.length+' record pulang';
+  if(showDate){
+    tb.innerHTML=data.map((d,i)=>`<tr><td>${i+1}</td><td><b>${d.nama}</b></td><td>${d.kelas}</td><td style="font-size:11px;font-family:monospace">${d.tgl||'-'}</td><td style="font-family:monospace;font-size:12px">${d.jam}</td><td><span class="badge b-pulang">${d.status}</span></td></tr>`).join('');
+  }else{
+    tb.innerHTML=data.map((d,i)=>`<tr><td>${i+1}</td><td><b>${d.nama}</b></td><td>${d.kelas}</td><td style="font-family:monospace;font-size:12px">${d.jam}</td><td><span class="badge b-pulang">${d.status}</span></td></tr>`).join('');
+  }
+}
+
 window.filterRekap=function(){
   const q=document.getElementById('rek-cari').value.toLowerCase();
   const filtered=q?rekapData.filter(d=>d.nama.toLowerCase().includes(q)):rekapData;
@@ -1850,25 +2084,37 @@ function getKelasNamaFromData(d){
 }
 // Store edit rows keyed by docId for safe modal open (handles names with quotes/dots)
 let _editRowMap={};
+let _kelasRowMap={};
 function renderEditTable(data){
-  const tb=document.getElementById('tbl-edit');
-  if(!data.length){tb.innerHTML='<tr><td colspan="5" style="color:var(--hint);text-align:center;padding:16px">Tidak ada data</td></tr>';return;}
-  // Sort A-Z by nama
   const sorted=[...data].sort((a,b)=>a.nama.localeCompare(b.nama,'id'));
   _editRowMap={};
   sorted.forEach(d=>{_editRowMap[d.id]=d;});
-  tb.innerHTML=sorted.map(d=>{
-    const kelasNama=getKelasNamaFromData(d);
-    const isLibur=liburSet.has(d.tanggal||'');
-    const sesiLabel=d.sesi==='pulang'?' <span style="font-size:10px;opacity:.6">🏠</span>':'';
-    return`<tr${isLibur?' style="background:var(--amber-bg)"':''}><td>${d.nama}${sesiLabel}</td><td>${kelasNama}</td><td>${d.jamStr||'-'}</td><td><span class="badge ${bc(d.status)}">${d.status}</span>${isLibur?' <span style="font-size:10px;color:var(--amber)">🏖️</span>':''}</td><td style="display:flex;gap:5px"><button class="btn btn-sm btn-blue" data-edit-id="${d.id}">Edit</button><button class="btn btn-sm btn-red" data-del-id="${d.id}">Hapus</button></td></tr>`;
-  }).join('');
-  // Attach events safely (handles any character in nama)
-  tb.querySelectorAll('[data-edit-id]').forEach(btn=>{
-    btn.onclick=()=>{const d=_editRowMap[btn.dataset.editId];if(d)openEditModalSafe(d);};
-  });
-  tb.querySelectorAll('[data-del-id]').forEach(btn=>{
-    btn.onclick=()=>hapusAbsen(btn.dataset.delId);
+  const masuk=sorted.filter(d=>(d.sesi||'masuk')!=='pulang');
+  const pulang=sorted.filter(d=>(d.sesi||'masuk')==='pulang');
+  const EMPTY='<tr><td colspan="5" style="color:var(--hint);text-align:center;padding:10px;font-size:12px">Tidak ada data</td></tr>';
+  function buildRows(arr){
+    return arr.map(d=>{
+      const kelasNama=getKelasNamaFromData(d);
+      const isLibur=liburSet.has(d.tanggal||'');
+      return`<tr${isLibur?' style="background:var(--amber-bg)"':''}><td>${d.nama}</td><td>${kelasNama}</td><td>${d.jamStr||'-'}</td><td><span class="badge ${bc(d.status)}">${d.status}</span>${isLibur?' <span style="font-size:10px;color:var(--amber)">🏖️</span>':''}</td><td style="display:flex;gap:5px"><button class="btn btn-sm btn-blue" data-edit-id="${d.id}">Edit</button><button class="btn btn-sm btn-red" data-del-id="${d.id}">Hapus</button></td></tr>`;
+    }).join('');
+  }
+  const tbM=document.getElementById('tbl-edit-masuk');
+  const tbP=document.getElementById('tbl-edit-pulang');
+  const cntM=document.getElementById('edit-masuk-count');
+  const cntP=document.getElementById('edit-pulang-count');
+  if(tbM){tbM.innerHTML=masuk.length?buildRows(masuk):EMPTY;}
+  if(tbP){tbP.innerHTML=pulang.length?buildRows(pulang):EMPTY;}
+  if(cntM)cntM.textContent=masuk.length?masuk.length+' siswa':'';
+  if(cntP)cntP.textContent=pulang.length?pulang.length+' siswa':'';
+  // Attach events
+  [tbM,tbP].forEach(tb=>{if(!tb)return;
+    tb.querySelectorAll('[data-edit-id]').forEach(btn=>{
+      btn.onclick=()=>{const d=_editRowMap[btn.dataset.editId];if(d)openEditModalSafe(d);};
+    });
+    tb.querySelectorAll('[data-del-id]').forEach(btn=>{
+      btn.onclick=()=>hapusAbsen(btn.dataset.delId);
+    });
   });
 }
 function openEditModalSafe(d){
@@ -1880,6 +2126,7 @@ function openEditModalSafe(d){
   document.getElementById('edit-sesi-val').value=d.sesi||d.jenis||'masuk';
   document.getElementById('modal-edit').classList.add('open');
 }
+window.setSesiFilter=function(mode){_editSesiFilter=mode;filterEditTable();};
 window.filterEditTable=function(){
   const q=document.getElementById('edit-cari').value.toLowerCase();
   const filtered=q?editDataAll.filter(d=>d.nama.toLowerCase().includes(q)):editDataAll;
@@ -1892,15 +2139,95 @@ window.openEditModal=function(id,nama,jam,status,tanggal,sesi){
 };
 window.simpanEdit=async function(){
   const id=document.getElementById('edit-doc-id').value;
+  // BUG FIX: Was saving to 'jenis' field instead of 'sesi' - sesi was never persisted
   await updateDoc(doc(db,'absensi',id),{
     jamStr:document.getElementById('edit-jam-val').value,
     status:document.getElementById('edit-status-val').value,
     tanggal:document.getElementById('edit-tanggal-val').value,
-    jenis:document.getElementById('edit-sesi-val').value
+    sesi:document.getElementById('edit-sesi-val').value
   });
   closeModal('modal-edit');const t2=document.getElementById('edit-tgl').value||todayStr();delete _editCache[t2];loadEditData(true);
 };
 window.hapusAbsen=async function(id){if(!confirm('Hapus data absen ini?'))return;await deleteDoc(doc(db,'absensi',id));const t=document.getElementById('edit-tgl').value||todayStr();delete _editCache[t];loadEditData(true);};
+
+window.hapusDuplikasi=async function(){
+  const tgl=document.getElementById('edit-tgl').value||todayStr();
+  const kelasId=document.getElementById('edit-kelas').value;
+  if(!confirm('Scan SEMUA data untuk tanggal yang dipilih dan hapus duplikat?\n(Setiap siswa maksimal 1x masuk + 1x pulang per hari. Data terbaru dipertahankan.)'))return;
+  // Always fetch fresh from Firestore for this date
+  let allForDate=[];
+  try{
+    const snap=await getDocs(query(collection(db,'absensi'),where('tanggal','==',tgl)));
+    snap.forEach(d=>allForDate.push({id:d.id,...d.data()}));
+  }catch(e){alert('Gagal memuat data: '+e.message);return;}
+  if(kelasId)allForDate=allForDate.filter(d=>d.kelasId===kelasId||siswaList.find(s=>s.nama===d.nama&&s.kelasId===kelasId));
+  // Group by nama + sesi (masuk/pulang) + tanggal
+  const groups={};
+  for(const d of allForDate){
+    const key=d.nama+'|'+(d.sesi||d.jenis||'masuk')+'|'+d.tanggal;
+    if(!groups[key])groups[key]=[];
+    groups[key].push(d);
+  }
+  const toDelete=[];
+  for(const [,recs] of Object.entries(groups)){
+    if(recs.length<=1)continue;
+    // Keep latest (by waktu.seconds), delete the rest
+    recs.sort((a,b)=>(b.waktu?.seconds||0)-(a.waktu?.seconds||0));
+    toDelete.push(...recs.slice(1));
+  }
+  if(!toDelete.length){alert('Tidak ada duplikasi ditemukan pada tanggal '+tgl+'.');return;}
+  if(!confirm(`Ditemukan ${toDelete.length} data duplikat pada ${tgl}.\nData terbaru dipertahankan, duplikat lama dihapus.\nLanjutkan?`))return;
+  let done=0;
+  for(const d of toDelete){
+    try{await deleteDoc(doc(db,'absensi',d.id));done++;}catch(e){}
+  }
+  alert('✅ '+done+' duplikat dihapus.');
+  delete _editCache[tgl];
+  loadEditData(true);
+};
+
+
+
+// Quick hapus absen dari tab rekap — maps current rekap mode ke bulk delete modal
+window.hapusAbsenRekap=function(){
+  const mode=document.getElementById('rek-view-mode')?.value||'harian';
+  const modeMap={harian:'harian',mingguan:'mingguan',bulanan:'bulanan'};
+  const bulkMode=modeMap[mode]||'harian';
+  // Pre-fill correct date from rekap context
+  const tglInput=document.getElementById('bulk-del-tgl');
+  const bulanInput=document.getElementById('bulk-del-bulan');
+  if(bulkMode==='harian'&&tglInput){tglInput.value=document.getElementById('rek-tgl')?.value||todayStr();}
+  else if(bulkMode==='mingguan'&&tglInput){tglInput.value=document.getElementById('rek-tgl-minggu')?.value||todayStr();}
+  else if(bulkMode==='bulanan'&&bulanInput){bulanInput.value=document.getElementById('rek-tgl-bulan')?.value||nowMonth();}
+  openHapusBulkModal(bulkMode);
+};
+
+
+// Hapus ghost data: absen dari siswa yang tidak lagi terdaftar
+window.hapusGhostData=async function(){
+  const tgl=document.getElementById('edit-tgl').value||todayStr();
+  if(!siswaList.length){alert('Data siswa belum dimuat.');return;}
+  const namaValid=new Set(siswaList.map(s=>s.nama));
+  let toScan=[];
+  try{
+    const snap=await getDocs(collection(db,'absensi'));
+    snap.forEach(d=>{const dd=d.data();if(!namaValid.has(dd.nama))toScan.push({id:d.id,...dd});});
+  }catch(e){alert('Gagal memuat data: '+e.message);return;}
+  if(!toScan.length){alert('Tidak ada ghost data ditemukan.\nSemua record absen milik siswa terdaftar.');return;}
+  const preview=toScan.slice(0,5).map(d=>d.nama+' ('+d.tanggal+')').join('\n');
+  if(!confirm('Ditemukan '+toScan.length+' ghost data (absen dari siswa tidak terdaftar):\n\n'+preview+(toScan.length>5?'\n...dan '+(toScan.length-5)+' lainnya':'')+' \n\nHapus semua? Tidak bisa dibatalkan.'))return;
+  let done=0;
+  const BATCH=20;
+  for(let i=0;i<toScan.length;i+=BATCH){
+    await Promise.all(toScan.slice(i,i+BATCH).map(d=>deleteDoc(doc(db,'absensi',d.id))));
+    done+=Math.min(BATCH,toScan.length-i);
+  }
+  // Clear all related caches
+  Object.keys(localStorage).filter(k=>k.startsWith('adm_cache_absen_')).forEach(k=>localStorage.removeItem(k));
+  Object.keys(_editCache).forEach(k=>delete _editCache[k]);
+  alert('✅ '+done+' ghost data dihapus.');
+  loadEditData(true);
+};
 
 window.populateSiswaSelect=function(){
   const kelasId=document.getElementById('iz-kelas').value;
@@ -1978,6 +2305,105 @@ window.exportExcelStat=function(){
   ws['!cols']=[{wch:5},{wch:28},{wch:14},{wch:8},{wch:12},{wch:8},{wch:8},{wch:8},{wch:14}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Statistik');
   XLSX.writeFile(wb,`Statistik_${bulan}.xlsx`);
+};
+
+// ── Update bulk delete modal kelas selector ──────────────────────────
+window.openHapusBulkModal=function(presetMode){
+  const opts=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
+  const sel=document.getElementById('bulk-del-kelas');
+  if(sel)sel.innerHTML='<option value="">Semua kelas</option>'+opts;
+  // Pre-fill dates from current context
+  const tglInput=document.getElementById('bulk-del-tgl');
+  const bulanInput=document.getElementById('bulk-del-bulan');
+  const modeEl=document.getElementById('bulk-del-mode');
+  if(tglInput)tglInput.value=document.getElementById('edit-tgl')?.value||todayStr();
+  if(bulanInput)bulanInput.value=document.getElementById('rek-tgl-bulan')?.value||nowMonth();
+  if(presetMode&&modeEl){modeEl.value=presetMode;}
+  updateBulkDelLabel();
+  document.getElementById('modal-hapus-bulk').classList.add('open');
+};
+
+window.updateBulkDelLabel=function(){
+  const mode=document.getElementById('bulk-del-mode').value;
+  const lbl=document.getElementById('bulk-del-label');
+  // Show/hide right date picker
+  const tglWrap=document.getElementById('bulk-del-tgl-wrap');
+  const bulanWrap=document.getElementById('bulk-del-bulan-wrap');
+  if(tglWrap)tglWrap.style.display=(mode==='bulanan')?'none':'block';
+  if(bulanWrap)bulanWrap.style.display=(mode==='bulanan')?'block':'none';
+  if(!lbl)return;
+  let desc='';
+  if(mode==='harian'){
+    const tgl=document.getElementById('bulk-del-tgl').value||todayStr();
+    desc=`Hapus semua absen tanggal <b>${tgl}</b>`;
+  } else if(mode==='mingguan'){
+    const tgl=document.getElementById('bulk-del-tgl').value||todayStr();
+    const d=new Date(tgl);const day=d.getDay();const diff=day===0?-6:1-day;
+    d.setDate(d.getDate()+diff);
+    const end=new Date(d);end.setDate(d.getDate()+6);
+    const fmtD=dd=>dd.toISOString().slice(0,10);
+    desc=`Hapus semua absen minggu <b>${fmtD(d)}</b> s/d <b>${fmtD(end)}</b>`;
+  } else {
+    const bulan=document.getElementById('bulk-del-bulan').value||nowMonth();
+    desc=`Hapus semua absen bulan <b>${bulan}</b>`;
+  }
+  lbl.innerHTML='⚠️ ' + desc + ' (tidak bisa dibatalkan!)';
+};
+
+window.konfirmasiBulkDelete=async function(){
+  const mode=document.getElementById('bulk-del-mode').value;
+  const kelasId=document.getElementById('bulk-del-kelas').value;
+  const btn=document.getElementById('bulk-del-confirm-btn');
+  const prog=document.getElementById('bulk-del-progress');
+  // Build date list
+  let dates=[];
+  if(mode==='harian'){
+    dates=[document.getElementById('bulk-del-tgl').value||todayStr()];
+  } else if(mode==='mingguan'){
+    const tgl=document.getElementById('bulk-del-tgl').value||todayStr();
+    const d=new Date(tgl);const day=d.getDay();const diff=day===0?-6:1-day;
+    d.setDate(d.getDate()+diff);
+    for(let i=0;i<7;i++){const dd=new Date(d);dd.setDate(d.getDate()+i);dates.push(dd.toISOString().slice(0,10));}
+  } else {
+    const bulan=document.getElementById('bulk-del-bulan').value||nowMonth();
+    const [yr,mo]=bulan.split('-').map(Number);const days=new Date(yr,mo,0).getDate();
+    for(let i=1;i<=days;i++)dates.push(`${bulan}-${String(i).padStart(2,'0')}`);
+  }
+  const nDates=dates.length;
+  if(!confirm(`Hapus SEMUA data absen untuk ${nDates} hari${kelasId?' (kelas '+kelasList.find(k=>k.id===kelasId)?.nama+')':''}?\n\nIni akan menghapus data permanen dari Firestore.`))return;
+  btn.disabled=true;
+  if(prog){prog.style.display='block';prog.textContent='Memuat data...';}
+  try{
+    let snap;
+    if(kelasId){
+      snap=await getDocs(query(collection(db,'absensi'),where('kelasId','==',kelasId)));
+    } else {
+      snap=await getDocs(collection(db,'absensi'));
+    }
+    const toDelete=[];
+    snap.forEach(d=>{
+      if(dates.includes(d.data().tanggal))toDelete.push(d.id);
+    });
+    if(!toDelete.length){alert('Tidak ada data absen ditemukan.');btn.disabled=false;if(prog)prog.style.display='none';return;}
+    let done=0;
+    const BATCH=20;// Delete in small batches
+    for(let i=0;i<toDelete.length;i+=BATCH){
+      await Promise.all(toDelete.slice(i,i+BATCH).map(id=>deleteDoc(doc(db,'absensi',id))));
+      done+=Math.min(BATCH,toDelete.length-i);
+      if(prog)prog.textContent=`Menghapus... ${done}/${toDelete.length}`;
+    }
+    // Clear related localStorage cache
+    dates.forEach(tgl=>localStorage.removeItem('adm_cache_absen_'+tgl));
+    Object.keys(_editCache).forEach(k=>delete _editCache[k]);
+    if(prog){prog.style.display='none';}
+    closeModal('modal-hapus-bulk');
+    alert(`✅ ${done} data absen berhasil dihapus.`);
+    loadEditData(true);loadRekap();
+  }catch(e){
+    if(prog)prog.style.display='none';
+    alert('Error: '+e.message);
+  }
+  btn.disabled=false;
 };
 
 function bc(st){if(st==='Hadir')return'b-hadir';if(st==='Terlambat')return'b-terlambat';if(st==='Alfa')return'b-alfa';if(st==='Izin')return'b-izin';if(st==='Sakit')return'b-sakit';if(st==='Pulang')return'b-pulang';if(st==='Bolos')return'b-bolos';return'b-belum';}
