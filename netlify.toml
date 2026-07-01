@@ -1,5 +1,0 @@
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Permissions-Policy = "camera=*, microphone=()"
-    Feature-Policy = "camera *"
