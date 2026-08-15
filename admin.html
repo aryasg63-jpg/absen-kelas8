@@ -531,7 +531,7 @@ if('serviceWorker' in navigator){
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, getDoc, setDoc, doc, updateDoc, deleteDoc, query, where, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, setDoc, doc, updateDoc, deleteDoc, query, where, Timestamp, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig={apiKey:"AIzaSyDlCnUvgyDT-oTfJJ-nxcPWkhpY_b6JeBw",authDomain:"absen-kelas8.firebaseapp.com",projectId:"absen-kelas8",storageBucket:"absen-kelas8.firebasestorage.app",messagingSenderId:"636560501063",appId:"1:636560501063:web:4384206e2a3cd94151c462"};
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
@@ -564,16 +564,28 @@ async function loadLibur(){
     console.warn('[Libur] Offline/error, pakai cache lokal:',e.message||e);
   }
 }
-async function saveLibur(){
-  const arr=[...liburSet];
-  localStorage.setItem('hari_libur_v2',JSON.stringify(arr));
-  try{
-    await setDoc(doc(db,'libur','set'),{tanggal:arr,updatedAt:Timestamp.now()});
-  }catch(e){console.warn('saveLibur offline:',e);}
-}
 window.toggleLibur=async function(tgl){
-  if(liburSet.has(tgl)){liburSet.delete(tgl);}else{liburSet.add(tgl);}
-  await saveLibur();
+  const dihapus=liburSet.has(tgl); // true = saat ini libur, aksi ini akan MENGHAPUS dari daftar libur
+  // Update lokal dulu (optimistic) supaya tombol langsung responsif
+  if(dihapus){liburSet.delete(tgl);}else{liburSet.add(tgl);}
+  localStorage.setItem('hari_libur_v2',JSON.stringify([...liburSet]));
+  try{
+    // arrayUnion/arrayRemove = operasi ATOMIK di server Firestore.
+    // Ini beda dgn kirim seluruh array: walau ada admin/perangkat lain yg mengubah
+    // tanggal LAIN di waktu bersamaan, perubahan keduanya tetap tersimpan (tidak saling timpa).
+    await setDoc(doc(db,'libur','set'),{
+      tanggal: dihapus?arrayRemove(tgl):arrayUnion(tgl),
+      updatedAt:Timestamp.now()
+    },{merge:true});
+  }catch(e){
+    // Gagal tersimpan ke server (mis. offline) -> batalkan perubahan lokal & beri tahu admin
+    // supaya tidak salah kira datanya sudah tersinkron ke perangkat lain, padahal cuma di HP/laptop ini saja.
+    if(dihapus){liburSet.add(tgl);}else{liburSet.delete(tgl);}
+    localStorage.setItem('hari_libur_v2',JSON.stringify([...liburSet]));
+    console.warn('[Libur] Gagal simpan ke server, perubahan dibatalkan:',e.message||e);
+    alert('Gagal menyimpan perubahan hari libur ke server (kemungkinan sedang offline).\nPerubahan DIBATALKAN agar data tidak berbeda antar perangkat.\nCoba lagi saat koneksi internet tersedia.');
+    throw e;
+  }
 };
 loadLibur();
 
@@ -1990,8 +2002,9 @@ window.loadEditData=async function(forceRefresh=false){
 };
 window.toggleLiburEdit=function(){
   const tgl=document.getElementById('edit-tgl').value||todayStr();
-  toggleLibur(tgl);
-  loadEditData();
+  const p=toggleLibur(tgl); // liburSet lokal sudah berubah secara sinkron sebelum baris ini
+  loadEditData(); // update tampilan langsung (optimistic)
+  p.catch(()=>{}).finally(()=>loadEditData()); // render ulang setelah proses ke server selesai (menangani kasus dibatalkan)
 };
 window.openTambahAbsenLalu=function(){
   const opts=kelasList.map(k=>`<option value="${k.id}">${k.nama}</option>`).join('');
