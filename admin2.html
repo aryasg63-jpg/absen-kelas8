@@ -213,7 +213,51 @@ tbody tr:hover td{background:var(--gray)}
     object-fit:contain!important;
   }
 }
-@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}.frow,.frow3{grid-template-columns:1fr}}
+@media(max-width:600px){
+  /* ===== Perbaikan tampilan mobile (admin) ===== */
+
+  .layout{padding:.75rem .6rem}
+  .card{padding:.9rem .85rem}
+
+  /* Nav atas: judul & tombol aksi ditumpuk jadi 2 baris rapi, tidak berdesakan */
+  .nav{padding:.7rem .85rem}
+  .nav-title{font-size:13px;line-height:1.35}
+  .nav-sub{font-size:10px}
+  .nav-l,.nav-r{width:100%}
+  .nav-r{justify-content:flex-end}
+
+  /* Tab menu: scroll horizontal 1 baris, bukan numpuk berantakan ke bawah */
+  .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;
+        margin:0 -.6rem 1rem;padding:0 .6rem 4px}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex-shrink:0}
+
+  /* Grid & baris filter -> ditumpuk 1 kolom penuh biar tidak mepet-mepetan */
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .frow,.frow3{grid-template-columns:1fr}
+  .filter-row{flex-direction:column;align-items:stretch}
+  .filter-row>div{width:100%}
+  .filter-row select,.filter-row input,#rek-cari,#edit-cari{width:100%!important}
+
+  /* Tombol: boleh membungkus 2 baris kalau teksnya panjang, jangan meluber */
+  .btn{white-space:normal}
+
+  /* Tabel: sel lebih ringkas biar konten pas & tombol Edit/Hapus tidak dempet.
+     min-width WAJIB: tanpa ini, table-layout:fixed memeras kolom "Nama" yang
+     lebarnya tidak ditentukan jadi hampir 0px (teks pecah huruf per huruf),
+     karena semua kolom lain sudah punya lebar pasti (px). Dengan min-width,
+     tabel jadi lebih lebar dari layar & discroll horizontal (.tbl-wrap sudah
+     overflow-x:auto), sehingga kolom Nama tetap dapat jatah ruang yang wajar. */
+  .tbl-wrap table{min-width:700px}
+  table{font-size:12px}
+  th,td{padding:7px 6px}
+  td .btn-sm{padding:4px 6px;font-size:11px}
+
+  /* Modal: hemat padding di layar sempit */
+  .modal-bg{padding:.6rem}
+  .modal{padding:1.1rem;max-width:100%!important}
+  #tambah-siswa-list{grid-template-columns:1fr!important}
+}
 </style>
 <script>
 if('serviceWorker' in navigator){
